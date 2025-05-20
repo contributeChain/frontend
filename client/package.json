@@ -1,0 +1,15 @@
+{
+  "name": "lens-alchemy-client",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "@lens-chain/sdk": "^1.0.3",
+    "@lens-chain/storage-client": "^1.0.4",
+    "dotenv": "^16.5.0",
+    "viem": "2.x"
+  },
+  "devDependencies": {
+    "typescript": "5.6.3",
+    "ts-node": "^10.9.1"
+  }
+} 

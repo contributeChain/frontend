@@ -3,9 +3,9 @@ import { createTokenClient, getAuthenticatedUser, type GitHubUser } from './gith
 import { uploadJson } from './groveClient';
 
 // GitHub OAuth configuration
-const GITHUB_CLIENT_ID = import.meta.env.VITE_GITHUB_CLIENT_ID as string;
-const GITHUB_CLIENT_SECRET = import.meta.env.VITE_GITHUB_CLIENT_SECRET as string;
-const GITHUB_REDIRECT_URI = import.meta.env.VITE_GITHUB_REDIRECT_URI || `${window.location.origin}/auth/callback`;
+const GITHUB_CLIENT_ID = import.meta.env.VITE_GITHUB_CLIENT_ID || "Ov23liUYQ7DJ0ipEFRWm";
+const GITHUB_CLIENT_SECRET = import.meta.env.VITE_GITHUB_CLIENT_SECRET || "d4171172b8b43bd513b6c4bae65fb88a88186c41";
+const GITHUB_REDIRECT_URI = import.meta.env.VITE_GITHUB_REDIRECT_URI || "http://localhost:3000/auth/callback";
 
 // Combined user profile type
 export interface UserProfile {
@@ -20,12 +20,13 @@ export interface UserProfile {
 export function getGitHubAuthUrl(): string {
   const baseUrl = 'https://github.com/login/oauth/authorize';
   const params = new URLSearchParams({
-    client_id: GITHUB_CLIENT_ID || '',
+    client_id: GITHUB_CLIENT_ID,
     redirect_uri: GITHUB_REDIRECT_URI,
     scope: 'read:user,repo',
     state: generateRandomState(),
   });
 
+  console.log('GitHub Auth URL:', `${baseUrl}?${params.toString()}`);
   return `${baseUrl}?${params.toString()}`;
 }
 
@@ -102,9 +103,52 @@ export async function linkWalletWithGitHubToken(
 // Link wallet with GitHub account (using GitHub user data)
 export async function linkWalletWithGitHub(
   walletAddress: string,
-  githubUser: GitHubUser
+  githubUser: GitHubUser | any
 ): Promise<UserProfile> {
   try {
+    console.log('Linking wallet with GitHub:', {
+      walletAddress: walletAddress.substring(0, 8) + '...',
+      githubUser: githubUser ? {
+        id: githubUser.id,
+        login: githubUser.login,
+        type: typeof githubUser
+      } : null
+    });
+    
+    if (!walletAddress) {
+      throw new Error('Wallet address is required');
+    }
+    
+    if (!githubUser) {
+      throw new Error('GitHub user data is required');
+    }
+    
+    // Ensure githubUser has required properties
+    if (!githubUser.id || !githubUser.login) {
+      console.warn('GitHub user data is incomplete:', githubUser);
+      // Try to recover if possible
+      if (typeof githubUser === 'string') {
+        // If it's a stringified object, try to parse it
+        try {
+          githubUser = JSON.parse(githubUser);
+        } catch (e) {
+          console.error('Failed to parse GitHub user data:', e);
+        }
+      }
+      
+      // If still not valid, create a minimal user object
+      if (!githubUser.id || !githubUser.login) {
+        githubUser = {
+          id: githubUser.id || Date.now(),
+          login: githubUser.login || 'github-user',
+          name: githubUser.name || 'GitHub User',
+          avatar_url: githubUser.avatar_url || '',
+          html_url: githubUser.html_url || '',
+          ...githubUser
+        };
+      }
+    }
+    
     // Get existing profile or create new
     const existingProfile = getLocalUserProfile() || { walletAddress, isAuthenticated: false };
     
@@ -116,6 +160,12 @@ export async function linkWalletWithGitHub(
       isAuthenticated: true
     };
     
+    console.log('Created profile:', {
+      walletAddress: profile.walletAddress.substring(0, 8) + '...',
+      hasGithubUser: !!profile.githubUser,
+      isAuthenticated: profile.isAuthenticated
+    });
+    
     // Store profile locally
     storeLocalUserProfile(profile);
     
@@ -123,9 +173,12 @@ export async function linkWalletWithGitHub(
     if (walletAddress.startsWith('0x') && walletAddress.length === 42) {
       try {
         await storeUserProfile(profile, walletAddress as `0x${string}`);
+        console.log('Successfully stored profile in Grove');
       } catch (error) {
         console.warn('Failed to store in Grove, but continuing with local storage:', error);
       }
+    } else {
+      console.warn('Not storing in Grove: invalid Ethereum address format');
     }
     
     return profile;

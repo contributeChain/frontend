@@ -10,11 +10,15 @@ import {
   insertContributionSchema
 } from "@shared/schema";
 import { setupGitHubRoutes } from "./api/github";
+import { setupGitHubOAuthRoutes } from "./api/githubOAuth";
 import { setupBlockchainRoutes } from "./api/blockchain";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // GitHub API routes
   setupGitHubRoutes(app);
+  
+  // GitHub OAuth routes
+  setupGitHubOAuthRoutes(app);
   
   // Blockchain API routes
   setupBlockchainRoutes(app);

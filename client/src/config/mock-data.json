@@ -1,0 +1,375 @@
+{
+  "users": [
+    {
+      "id": 1,
+      "username": "Sarah Chen",
+      "githubUsername": "sarahcodes",
+      "avatarUrl": "https://images.unsplash.com/photo-1580489944761-15a19d654956?ixlib=rb-4.0.3&auto=format&fit=crop&w=40&h=40&q=80",
+      "reputation": 876,
+      "password": "",
+      "walletAddress": "0x123...",
+      "bio": "Full-stack developer specializing in React and Node.js",
+      "location": "San Francisco, CA",
+      "website": "https://sarahchen.dev",
+      "createdAt": "2023-01-15T00:00:00.000Z"
+    },
+    {
+      "id": 2,
+      "username": "Alex Rivera",
+      "githubUsername": "alexdev",
+      "avatarUrl": "https://images.unsplash.com/photo-1568602471122-7832951cc4c5?ixlib=rb-4.0.3&auto=format&fit=crop&w=40&h=40&q=80",
+      "reputation": 742,
+      "password": "",
+      "walletAddress": "0x456...",
+      "bio": "Blockchain engineer and open-source contributor",
+      "location": "Miami, FL",
+      "website": "https://alexrivera.io",
+      "createdAt": "2023-02-20T00:00:00.000Z"
+    },
+    {
+      "id": 3,
+      "username": "Michael Thompson",
+      "githubUsername": "mthompson",
+      "avatarUrl": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?ixlib=rb-4.0.3&auto=format&fit=crop&w=40&h=40&q=80",
+      "reputation": 685,
+      "password": "",
+      "walletAddress": "0x789...",
+      "bio": "Smart contract developer and DeFi enthusiast",
+      "location": "Berlin, Germany",
+      "website": "https://mthompson.dev",
+      "createdAt": "2023-03-10T00:00:00.000Z"
+    },
+    {
+      "id": 4,
+      "username": "Maya Johnson",
+      "githubUsername": "mayacodes",
+      "avatarUrl": "https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?ixlib=rb-4.0.3&auto=format&fit=crop&w=40&h=40&q=80",
+      "reputation": 524,
+      "password": "",
+      "walletAddress": "0xabc...",
+      "bio": "Frontend developer focused on Web3 UX",
+      "location": "London, UK",
+      "website": "https://mayajohnson.com",
+      "createdAt": "2023-04-05T00:00:00.000Z"
+    },
+    {
+      "id": 5,
+      "username": "David Kim",
+      "githubUsername": "davidkim",
+      "avatarUrl": "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?ixlib=rb-4.0.3&auto=format&fit=crop&w=40&h=40&q=80",
+      "reputation": 489,
+      "password": "",
+      "walletAddress": "0xdef...",
+      "bio": "Solidity developer and security researcher",
+      "location": "Seoul, South Korea",
+      "website": "https://davidkim.dev",
+      "createdAt": "2023-05-15T00:00:00.000Z"
+    }
+  ],
+  "repositories": [
+    {
+      "id": 1,
+      "userId": 1,
+      "name": "defi-dashboard",
+      "description": "A comprehensive dashboard for DeFi protocols",
+      "stars": 342,
+      "forks": 78,
+      "language": "TypeScript"
+    },
+    {
+      "id": 2,
+      "userId": 1,
+      "name": "smart-contract-library",
+      "description": "Collection of reusable smart contract components",
+      "stars": 215,
+      "forks": 43,
+      "language": "Solidity"
+    },
+    {
+      "id": 3,
+      "userId": 2,
+      "name": "nft-marketplace",
+      "description": "Decentralized NFT marketplace with low fees",
+      "stars": 189,
+      "forks": 37,
+      "language": "JavaScript"
+    },
+    {
+      "id": 4,
+      "userId": 3,
+      "name": "eth-wallet",
+      "description": "Secure Ethereum wallet implementation",
+      "stars": 276,
+      "forks": 52,
+      "language": "TypeScript"
+    },
+    {
+      "id": 5,
+      "userId": 4,
+      "name": "web3-components",
+      "description": "React component library for Web3 applications",
+      "stars": 321,
+      "forks": 64,
+      "language": "TypeScript"
+    }
+  ],
+  "nfts": [
+    {
+      "id": 1,
+      "userId": 1,
+      "tokenId": "0x1234...",
+      "name": "Code Guardian",
+      "description": "Reward for identifying a critical security vulnerability",
+      "imageUrl": "https://example.com/nft1.png",
+      "rarity": "Legendary",
+      "repoName": "smart-contract-library",
+      "mintedAt": "2023-06-10T00:00:00.000Z",
+      "transactionHash": "0xabcd...",
+      "metadata": {
+        "attributes": [
+          {
+            "trait_type": "Category",
+            "value": "Security"
+          }
+        ]
+      }
+    },
+    {
+      "id": 2,
+      "userId": 2,
+      "tokenId": "0x2345...",
+      "name": "Innovation Pioneer",
+      "description": "First implementation of a novel algorithm",
+      "imageUrl": "https://example.com/nft2.png",
+      "rarity": "Epic",
+      "repoName": "nft-marketplace",
+      "mintedAt": "2023-07-15T00:00:00.000Z",
+      "transactionHash": "0xbcde...",
+      "metadata": {
+        "attributes": [
+          {
+            "trait_type": "Category",
+            "value": "Innovation"
+          }
+        ]
+      }
+    },
+    {
+      "id": 3,
+      "userId": 3,
+      "tokenId": "0x3456...",
+      "name": "Community Builder",
+      "description": "Recognition for outstanding open-source contributions",
+      "imageUrl": "https://example.com/nft3.png",
+      "rarity": "Rare",
+      "repoName": "eth-wallet",
+      "mintedAt": "2023-08-20T00:00:00.000Z",
+      "transactionHash": "0xcdef...",
+      "metadata": {
+        "attributes": [
+          {
+            "trait_type": "Category",
+            "value": "Community"
+          }
+        ]
+      }
+    },
+    {
+      "id": 4,
+      "userId": 4,
+      "tokenId": "0x4567...",
+      "name": "UX Master",
+      "description": "Excellence in user experience design",
+      "imageUrl": "https://example.com/nft4.png",
+      "rarity": "Uncommon",
+      "repoName": "web3-components",
+      "mintedAt": "2023-09-25T00:00:00.000Z",
+      "transactionHash": "0xdefg...",
+      "metadata": {
+        "attributes": [
+          {
+            "trait_type": "Category",
+            "value": "Design"
+          }
+        ]
+      }
+    },
+    {
+      "id": 5,
+      "userId": 5,
+      "tokenId": "0x5678...",
+      "name": "Performance Optimizer",
+      "description": "Significant improvements to code efficiency",
+      "imageUrl": "https://example.com/nft5.png",
+      "rarity": "Epic",
+      "repoName": "blockchain-indexer",
+      "mintedAt": "2023-10-30T00:00:00.000Z",
+      "transactionHash": "0xefgh...",
+      "metadata": {
+        "attributes": [
+          {
+            "trait_type": "Category",
+            "value": "Performance"
+          }
+        ]
+      }
+    }
+  ],
+  "activities": [
+    {
+      "activity": {
+        "id": 1,
+        "userId": 1,
+        "type": "commit",
+        "repoName": "defi-dashboard",
+        "description": "Committed to defi-dashboard",
+        "createdAt": "2025-05-18T08:33:51.168Z",
+        "metadata": {
+          "tags": [
+            {
+              "name": "TypeScript",
+              "color": "#3178c6"
+            }
+          ]
+        }
+      },
+      "user": {
+        "id": 1,
+        "username": "Sarah Chen",
+        "githubUsername": "sarahcodes",
+        "avatarUrl": "https://images.unsplash.com/photo-1580489944761-15a19d654956?ixlib=rb-4.0.3&auto=format&fit=crop&w=40&h=40&q=80",
+        "reputation": 876,
+        "password": "",
+        "walletAddress": "0x123...",
+        "bio": "Full-stack developer specializing in React and Node.js",
+        "location": "San Francisco, CA",
+        "website": "https://sarahchen.dev",
+        "createdAt": "2023-01-15T00:00:00.000Z"
+      }
+    },
+    {
+      "activity": {
+        "id": 2,
+        "userId": 2,
+        "type": "pull_request",
+        "repoName": "nft-marketplace",
+        "description": "Opened PR in nft-marketplace",
+        "createdAt": "2025-05-19T15:55:31.841Z",
+        "metadata": {
+          "tags": [
+            {
+              "name": "JavaScript",
+              "color": "#3178c6"
+            }
+          ]
+        }
+      },
+      "user": {
+        "id": 2,
+        "username": "Alex Rivera",
+        "githubUsername": "alexdev",
+        "avatarUrl": "https://images.unsplash.com/photo-1568602471122-7832951cc4c5?ixlib=rb-4.0.3&auto=format&fit=crop&w=40&h=40&q=80",
+        "reputation": 742,
+        "password": "",
+        "walletAddress": "0x456...",
+        "bio": "Blockchain engineer and open-source contributor",
+        "location": "Miami, FL",
+        "website": "https://alexrivera.io",
+        "createdAt": "2023-02-20T00:00:00.000Z"
+      }
+    },
+    {
+      "activity": {
+        "id": 3,
+        "userId": 3,
+        "type": "issue",
+        "repoName": "eth-wallet",
+        "description": "Created issue in eth-wallet",
+        "createdAt": "2025-05-20T10:11:01.863Z",
+        "metadata": {
+          "tags": [
+            {
+              "name": "TypeScript",
+              "color": "#3178c6"
+            }
+          ]
+        }
+      },
+      "user": {
+        "id": 3,
+        "username": "Michael Thompson",
+        "githubUsername": "mthompson",
+        "avatarUrl": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?ixlib=rb-4.0.3&auto=format&fit=crop&w=40&h=40&q=80",
+        "reputation": 685,
+        "password": "",
+        "walletAddress": "0x789...",
+        "bio": "Smart contract developer and DeFi enthusiast",
+        "location": "Berlin, Germany",
+        "website": "https://mthompson.dev",
+        "createdAt": "2023-03-10T00:00:00.000Z"
+      }
+    },
+    {
+      "activity": {
+        "id": 4,
+        "userId": 4,
+        "type": "release",
+        "repoName": "web3-components",
+        "description": "Released version in web3-components",
+        "createdAt": "2025-05-16T21:21:41.795Z",
+        "metadata": {
+          "tags": [
+            {
+              "name": "TypeScript",
+              "color": "#3178c6"
+            }
+          ]
+        }
+      },
+      "user": {
+        "id": 4,
+        "username": "Maya Johnson",
+        "githubUsername": "mayacodes",
+        "avatarUrl": "https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?ixlib=rb-4.0.3&auto=format&fit=crop&w=40&h=40&q=80",
+        "reputation": 524,
+        "password": "",
+        "walletAddress": "0xabc...",
+        "bio": "Frontend developer focused on Web3 UX",
+        "location": "London, UK",
+        "website": "https://mayajohnson.com",
+        "createdAt": "2023-04-05T00:00:00.000Z"
+      }
+    },
+    {
+      "activity": {
+        "id": 5,
+        "userId": 5,
+        "type": "fork",
+        "repoName": "defi-dashboard",
+        "description": "Forked defi-dashboard",
+        "createdAt": "2025-05-13T15:46:59.237Z",
+        "metadata": {
+          "tags": [
+            {
+              "name": "TypeScript",
+              "color": "#3178c6"
+            }
+          ]
+        }
+      },
+      "user": {
+        "id": 5,
+        "username": "David Kim",
+        "githubUsername": "davidkim",
+        "avatarUrl": "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?ixlib=rb-4.0.3&auto=format&fit=crop&w=40&h=40&q=80",
+        "reputation": 489,
+        "password": "",
+        "walletAddress": "0xdef...",
+        "bio": "Solidity developer and security researcher",
+        "location": "Seoul, South Korea",
+        "website": "https://davidkim.dev",
+        "createdAt": "2023-05-15T00:00:00.000Z"
+      }
+    }
+  ]
+}

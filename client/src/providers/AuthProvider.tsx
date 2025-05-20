@@ -76,9 +76,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   // Update user when GitHub auth changes
   useEffect(() => {
+    console.log('GitHub auth state changed:', {
+      isConnected,
+      address: address?.substring(0, 8) + '...',
+      isGitHubAuthenticated,
+      hasGithubUser: !!githubUser,
+      currentUser: user ? {
+        walletAddress: user.walletAddress.substring(0, 8) + '...',
+        hasGithubUser: !!user.githubUser
+      } : null
+    });
+    
     const updateWithGitHubInfo = async () => {
       if (isConnected && address && isGitHubAuthenticated && githubUser && user) {
         if (!user.githubUser || user.githubUser.id !== githubUser.id) {
+          console.log('Updating user profile with GitHub info');
           // Update the user profile with GitHub info
           const updatedProfile: UserProfile = {
             ...user,
@@ -103,13 +115,29 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // Link GitHub account with wallet
   const linkGithubWithWallet = async () => {
     try {
+      console.log('Attempting to link GitHub with wallet:', {
+        isConnected, 
+        address: address?.substring(0, 8) + '...',
+        isGitHubAuthenticated,
+        hasGithubUser: !!githubUser
+      });
+      
       if (!isConnected || !address) {
         throw new Error('Wallet not connected');
       }
       
-      if (!isGitHubAuthenticated || !githubUser) {
-        throw new Error('GitHub not authenticated');
+      // Instead of checking isGitHubAuthenticated, check for githubUser directly
+      if (!githubUser) {
+        throw new Error('GitHub user data not available');
       }
+      
+      console.log('Linking wallet with GitHub user:', {
+        walletAddress: address,
+        githubUser: {
+          login: githubUser.login,
+          id: githubUser.id
+        }
+      });
 
       // Link wallet with GitHub in the backend/storage
       await linkWalletWithGitHub(address, githubUser);
@@ -123,6 +151,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
         };
         setUser(updatedProfile);
         storeLocalUserProfile(updatedProfile);
+        console.log('Successfully linked GitHub with wallet');
+      } else {
+        console.warn('No user profile to update after GitHub linking');
+        // Create a new user profile if none exists
+        const newProfile: UserProfile = {
+          walletAddress: address,
+          githubUser,
+          isAuthenticated: true,
+        };
+        setUser(newProfile);
+        storeLocalUserProfile(newProfile);
       }
       
       return Promise.resolve();

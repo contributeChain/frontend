@@ -11,7 +11,7 @@ export function RainbowKitButton() {
 }
 
 // Custom styled version if needed
-export function CustomRainbowKitButton() {
+export function CustomRainbowKitButton({ className = '' }) {
   return (
     <ConnectButton.Custom>
       {({
@@ -42,10 +42,10 @@ export function CustomRainbowKitButton() {
                   <button 
                     onClick={openConnectModal} 
                     type="button"
-                    className="bg-gradient-to-r from-primary to-accent text-white font-medium py-2 px-4 rounded-full hover:shadow-lg transition-all duration-200 flex items-center space-x-2"
+                    className={`bg-gradient-to-r from-primary to-accent text-white font-medium rounded-full hover:shadow-lg transition-all duration-200 flex items-center space-x-2 ${className}`}
                   >
-                    <i className="fas fa-wallet"></i>
-                    <span>Connect Wallet</span>
+                    <i className="fas fa-wallet mr-1"></i>
+                    <span>Connect</span>
                   </button>
                 );
               }
@@ -55,7 +55,7 @@ export function CustomRainbowKitButton() {
                   <button
                     onClick={openChainModal}
                     type="button"
-                    className="flex items-center gap-1 px-3 py-1.5 bg-white/10 backdrop-blur-md rounded-full text-sm font-medium text-white hover:bg-white/20 transition-colors"
+                    className={`flex items-center gap-1 bg-white/10 backdrop-blur-md rounded-full font-medium text-white hover:bg-white/20 transition-colors ${className}`}
                   >
                     {chain.hasIcon && (
                       <div
@@ -82,7 +82,7 @@ export function CustomRainbowKitButton() {
                   <button
                     onClick={openAccountModal}
                     type="button"
-                    className="flex items-center gap-1 px-3 py-1.5 bg-white/10 backdrop-blur-md rounded-full text-sm font-medium text-white hover:bg-white/20 transition-colors"
+                    className={`flex items-center gap-1 bg-white/10 backdrop-blur-md rounded-full font-medium text-white hover:bg-white/20 transition-colors ${className}`}
                   >
                     {account.displayName}
                     {account.displayBalance && (
