@@ -67,8 +67,8 @@ export function clearLocalUserProfile(): void {
   localStorage.removeItem('user_profile');
 }
 
-// Link wallet with GitHub account
-export async function linkWalletWithGitHub(
+// Link wallet with GitHub account (using token)
+export async function linkWalletWithGitHubToken(
   walletAddress: string,
   ensName: string | undefined,
   githubToken: string
@@ -90,6 +90,42 @@ export async function linkWalletWithGitHub(
     
     // Store profile locally
     storeLocalUserProfile(profile);
+    
+    return profile;
+  } catch (error) {
+    console.error('Failed to link wallet with GitHub:', error);
+    throw error;
+  }
+}
+
+// Link wallet with GitHub account (using GitHub user data)
+export async function linkWalletWithGitHub(
+  walletAddress: string,
+  githubUser: GitHubUser
+): Promise<UserProfile> {
+  try {
+    // Get existing profile or create new
+    const existingProfile = getLocalUserProfile() || { walletAddress, isAuthenticated: false };
+    
+    // Create combined profile
+    const profile: UserProfile = {
+      ...existingProfile,
+      walletAddress,
+      githubUser,
+      isAuthenticated: true
+    };
+    
+    // Store profile locally
+    storeLocalUserProfile(profile);
+    
+    // Store in Grove if it's an Ethereum address
+    if (walletAddress.startsWith('0x') && walletAddress.length === 42) {
+      try {
+        await storeUserProfile(profile, walletAddress as `0x${string}`);
+      } catch (error) {
+        console.warn('Failed to store in Grove, but continuing with local storage:', error);
+      }
+    }
     
     return profile;
   } catch (error) {

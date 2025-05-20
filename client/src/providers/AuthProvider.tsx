@@ -18,6 +18,7 @@ interface AuthContextType {
   connectGitHub: () => void;
   disconnectGitHub: () => void;
   logout: () => void;
+  linkGithubWithWallet: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -99,6 +100,38 @@ export function AuthProvider({ children }: AuthProviderProps) {
     window.location.href = getGitHubAuthUrl();
   };
 
+  // Link GitHub account with wallet
+  const linkGithubWithWallet = async () => {
+    try {
+      if (!isConnected || !address) {
+        throw new Error('Wallet not connected');
+      }
+      
+      if (!isGitHubAuthenticated || !githubUser) {
+        throw new Error('GitHub not authenticated');
+      }
+
+      // Link wallet with GitHub in the backend/storage
+      await linkWalletWithGitHub(address, githubUser);
+      
+      // Update local user profile
+      if (user) {
+        const updatedProfile: UserProfile = {
+          ...user,
+          githubUser,
+          isAuthenticated: true,
+        };
+        setUser(updatedProfile);
+        storeLocalUserProfile(updatedProfile);
+      }
+      
+      return Promise.resolve();
+    } catch (error) {
+      console.error('Error linking GitHub with wallet:', error);
+      return Promise.reject(error);
+    }
+  };
+
   // Disconnect GitHub account
   const disconnectGitHub = () => {
     if (user) {
@@ -130,6 +163,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     connectGitHub,
     disconnectGitHub,
     logout,
+    linkGithubWithWallet,
   };
 
   return (
