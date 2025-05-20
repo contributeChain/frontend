@@ -24,6 +24,12 @@ export default function MobileNav() {
             <span className="text-xs mt-1">Repos</span>
           </a>
         </Link>
+        <Link href="/mint-nft">
+          <a className={`flex flex-col items-center ${location === "/mint-nft" ? "text-primary" : "text-gray-500 dark:text-gray-400"}`}>
+            <i className="fas fa-award"></i>
+            <span className="text-xs mt-1">Mint</span>
+          </a>
+        </Link>
         <Link href="/social">
           <a className={`flex flex-col items-center ${location === "/social" ? "text-primary" : "text-gray-500 dark:text-gray-400"}`}>
             <i className="fas fa-users"></i>

@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
 import { Helmet } from "react-helmet";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Repository } from "@shared/schema";
 import RepositoryCard from "@/components/repository-card";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/providers/AuthProvider";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 export default function Repositories() {
@@ -13,7 +15,9 @@ export default function Repositories() {
   const [filteredRepositories, setFilteredRepositories] = useState<Repository[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<string>("all");
+  const [, navigate] = useLocation();
   const { toast } = useToast();
+  const { isAuthenticated } = useAuth();
 
   useEffect(() => {
     const fetchRepositories = async () => {
@@ -90,6 +94,19 @@ export default function Repositories() {
     setFilter(newFilter);
   };
 
+  const handleAddRepository = () => {
+    if (!isAuthenticated) {
+      toast({
+        title: "Authentication Required",
+        description: "Please connect your wallet to add a repository",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    navigate("/add-repository");
+  };
+
   // Placeholder data if API failed
   const ensureRepositories = filteredRepositories.length > 0 ? filteredRepositories : [
     {
@@ -143,6 +160,14 @@ export default function Repositories() {
             </div>
             
             <div className="flex gap-3 w-full md:w-auto">
+              <Button 
+                onClick={handleAddRepository}
+                className="bg-primary hover:bg-primary/90 text-white"
+              >
+                <i className="fas fa-plus mr-2"></i>
+                Add Repository
+              </Button>
+              
               <div className="relative flex-1 md:flex-none">
                 <form onSubmit={handleSearch}>
                   <Input 

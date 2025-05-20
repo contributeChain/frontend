@@ -42,6 +42,9 @@ export default function Header() {
             <Link href="/social" className="transition-colors hover:text-foreground/80 text-foreground/60">
               Social
             </Link>
+            <Link href="/mint-nft" className="transition-colors hover:text-foreground/80 text-foreground/60">
+              Mint NFT
+            </Link>
           </nav>
         </div>
 

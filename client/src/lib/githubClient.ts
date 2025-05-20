@@ -3,8 +3,8 @@ import { createOAuthUserAuth } from '@octokit/auth-oauth-user';
 import { createTokenAuth } from '@octokit/auth-token';
 
 // GitHub OAuth App credentials
-const GITHUB_CLIENT_ID = process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID as string;
-const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET as string;
+const GITHUB_CLIENT_ID = import.meta.env.VITE_GITHUB_CLIENT_ID as string;
+const GITHUB_CLIENT_SECRET = import.meta.env.VITE_GITHUB_CLIENT_SECRET as string;
 
 // Initialize base Octokit instance
 export const octokit = new Octokit();
