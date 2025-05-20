@@ -20,6 +20,7 @@ import {
   generateNftImageUrl, 
   mintContributionNft 
 } from "@/lib/nft-service";
+import { addNFTToCollection } from "@/lib/grove-service";
 
 export default function MintNftPage() {
   const [, navigate] = useLocation();
@@ -192,6 +193,39 @@ export default function MintNftPage() {
       );
       
       if (result.success) {
+        // Create NFT object to add to collection
+        const nftData = {
+          id: Date.now(), // Generate a unique ID
+          userId: 1, // Default user ID
+          tokenId: result.transactionHash?.substring(0, 10) || `NFT-${Date.now()}`,
+          name: `${repo} Contribution`,
+          description: `Contribution to ${owner}/${repo} by ${contributor}`,
+          imageUrl: nftImageUrl,
+          rarity: contributionStats.score >= 1000 ? "legendary" :
+                  contributionStats.score >= 500 ? "epic" :
+                  contributionStats.score >= 200 ? "rare" :
+                  contributionStats.score >= 50 ? "uncommon" : "common",
+          repoName: `${owner}/${repo}`,
+          mintedAt: new Date(),
+          transactionHash: result.transactionHash || "",
+          metadata: {
+            contributionScore: contributionStats.score,
+            commits: contributionStats.commits,
+            additions: contributionStats.additions,
+            deletions: contributionStats.deletions,
+            pullRequests: contributionStats.pullRequests,
+            issues: contributionStats.issues
+          }
+        };
+        
+        // Add NFT to Grove collection
+        const addedToGrove = await addNFTToCollection(nftData, address as `0x${string}`);
+        if (addedToGrove) {
+          console.log('NFT added to Grove collection successfully');
+        } else {
+          console.warn('Failed to add NFT to Grove collection');
+        }
+        
         setMintingSuccess(true);
         if (result.transactionHash) {
           setTransactionHash(result.transactionHash);

@@ -8,7 +8,7 @@ import { Container } from "@/components/layout/container";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/providers/AuthProvider";
 import { getRepository, getRepositoryContributions, GitHubRepository } from "@/lib/githubClient";
-import { Repository } from "@shared/schema";
+import { getRepositoryById, Repository } from "@/lib/grove-service";
 
 // Define a type for GitHub contributions based on the actual structure
 interface GithubContributor {
@@ -37,23 +37,43 @@ export default function RepositoryDetailPage({ params }: RepositoryDetailPagePro
   const [githubRepo, setGithubRepo] = useState<GitHubRepository | null>(null);
   const [contributions, setContributions] = useState<GithubContributor[] | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Fetch repository data
   useEffect(() => {
     const fetchRepositoryData = async () => {
       setIsLoading(true);
+      setNotFound(false);
+      setErrorMessage(null);
+      
       try {
-        // Fetch repository from API
-        const response = await fetch(`/api/repositories/${id}`);
+        // Parse the ID to a number
+        const repoId = parseInt(id);
         
-        if (response.ok) {
-          const repoData = await response.json();
+        if (isNaN(repoId)) {
+          console.error(`Invalid repository ID: ${id}`);
+          setNotFound(true);
+          toast({
+            title: "Invalid repository ID",
+            description: `"${id}" is not a valid repository ID.`,
+            variant: "destructive"
+          });
+          return;
+        }
+        
+        // Fetch repository from Grove
+        const repoData = await getRepositoryById(repoId);
+        
+        if (repoData) {
           setRepository(repoData);
           
-          // If we have a full name, fetch additional GitHub data
-          if (repoData.githubFullName) {
-            const [owner, repo] = repoData.githubFullName.split('/');
+          // Extract owner and repo name from the repository name (assuming format: "owner/repo")
+          const [owner, repo] = repoData.name.split('/');
+          
+          if (owner && repo) {
             try {
+              // Fetch additional GitHub data
               const githubRepoData = await getRepository(owner, repo);
               setGithubRepo(githubRepoData as GitHubRepository);
               
@@ -61,18 +81,24 @@ export default function RepositoryDetailPage({ params }: RepositoryDetailPagePro
               setContributions(contributionsData as GithubContributor[]);
             } catch (error) {
               console.error("Error fetching GitHub data:", error);
+              setErrorMessage("Could not fetch additional GitHub data for this repository.");
+              // Don't set notFound here, as we still have the basic repository data
             }
+          } else {
+            setErrorMessage("Repository name format is not valid for fetching GitHub data. Expected format: 'owner/repo'.");
           }
         } else {
+          console.error(`Repository not found: ${id}`);
+          setNotFound(true);
           toast({
-            title: "Error",
-            description: "Failed to load repository details",
+            title: "Repository not found",
+            description: `The repository with ID ${id} could not be found.`,
             variant: "destructive"
           });
-          navigate("/repositories");
         }
       } catch (error) {
         console.error("Error fetching repository:", error);
+        setNotFound(true);
         toast({
           title: "Error",
           description: "Failed to load repository details",
@@ -84,7 +110,7 @@ export default function RepositoryDetailPage({ params }: RepositoryDetailPagePro
     };
     
     fetchRepositoryData();
-  }, [id, toast, navigate]);
+  }, [id, toast]);
 
   // Format date for display
   const formatDate = (dateString: string | Date | null) => {
@@ -96,6 +122,18 @@ export default function RepositoryDetailPage({ params }: RepositoryDetailPagePro
       day: 'numeric'
     });
   };
+
+  // Extract owner and repo name
+  const getOwnerAndRepo = (fullName: string): { owner: string | null, repo: string | null } => {
+    const parts = fullName.split('/');
+    if (parts.length >= 2) {
+      return { owner: parts[0], repo: parts[1] };
+    }
+    return { owner: null, repo: null };
+  };
+
+  // Get repository owner and name
+  const { owner: repoOwner, repo: repoName } = repository ? getOwnerAndRepo(repository.name) : { owner: null, repo: null };
 
   if (isLoading) {
     return (
@@ -127,7 +165,7 @@ export default function RepositoryDetailPage({ params }: RepositoryDetailPagePro
     );
   }
 
-  if (!repository) {
+  if (notFound || !repository) {
     return (
       <section className="py-16 bg-gradient-to-b from-white to-gray-50 dark:from-gray-900 dark:to-darkBg min-h-screen">
         <Container>
@@ -136,11 +174,16 @@ export default function RepositoryDetailPage({ params }: RepositoryDetailPagePro
               <i className="fas fa-exclamation-triangle text-4xl text-yellow-500 mb-4"></i>
               <h2 className="text-xl font-display font-bold mb-2">Repository Not Found</h2>
               <p className="text-gray-600 dark:text-gray-400 mb-6">
-                The repository you're looking for doesn't exist or you don't have permission to view it.
+                The repository with ID <span className="font-semibold">{id}</span> doesn't exist or you don't have permission to view it.
               </p>
-              <Button onClick={() => navigate("/repositories")}>
-                Return to Repositories
-              </Button>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <Button onClick={() => navigate("/repositories")} variant="outline">
+                  <i className="fas fa-list mr-2"></i> Browse Repositories
+                </Button>
+                <Button onClick={() => navigate("/add-repository")}>
+                  <i className="fas fa-plus mr-2"></i> Add Repository
+                </Button>
+              </div>
             </div>
           </div>
         </Container>
@@ -157,6 +200,18 @@ export default function RepositoryDetailPage({ params }: RepositoryDetailPagePro
 
       <section className="py-16 bg-gradient-to-b from-white to-gray-50 dark:from-gray-900 dark:to-darkBg min-h-screen">
         <Container>
+          {errorMessage && (
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 text-yellow-800 dark:text-yellow-200 rounded-lg p-4 mb-6">
+              <div className="flex items-start">
+                <i className="fas fa-exclamation-circle mr-3 mt-0.5"></i>
+                <div>
+                  <p className="font-medium">Note</p>
+                  <p className="text-sm">{errorMessage}</p>
+                </div>
+              </div>
+            </div>
+          )}
+          
           <div className="max-w-4xl mx-auto">
             <div className="flex justify-between items-start mb-8">
               <div>
@@ -169,9 +224,13 @@ export default function RepositoryDetailPage({ params }: RepositoryDetailPagePro
                   <i className="fas fa-arrow-left mr-2"></i>
                   Back to Repositories
                 </Button>
-                <h1 className="text-3xl md:text-4xl font-display font-bold">{repository.name}</h1>
+                <h1 className="text-3xl md:text-4xl font-display font-bold">
+                  {repoName || repository.name}
+                </h1>
                 <p className="text-gray-600 dark:text-gray-400 mt-2">
-                  Added by {repository.userId} • {formatDate(repository.lastUpdated)}
+                  {repoOwner && <span className="font-medium">{repoOwner}</span>}
+                  {repoOwner && " • "}
+                  Added on {formatDate(repository.lastUpdated)}
                 </p>
               </div>
               
@@ -241,7 +300,8 @@ export default function RepositoryDetailPage({ params }: RepositoryDetailPagePro
                       <Button 
                         size="sm"
                         variant="secondary"
-                        onClick={() => navigate(`/mint-nft?repo=${githubRepo?.owner?.login || ''}/${repository.name}`)}
+                        onClick={() => navigate(`/mint-nft?repo=${repoOwner || ''}/${repoName || repository.name}`)}
+                        disabled={!repoOwner || !repoName}
                       >
                         <i className="fas fa-award mr-2"></i>
                         Mint NFT

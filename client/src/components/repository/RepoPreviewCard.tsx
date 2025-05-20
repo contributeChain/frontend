@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/providers/AuthProvider";
 import { uploadJson } from "@/lib/groveClient";
 import { GitHubRepository } from "@/lib/githubClient";
+import { addRepositoryToCollection, type Repository } from "@/lib/grove-service";
 
 interface RepoPreviewCardProps {
   owner: string;
@@ -61,6 +62,32 @@ export default function RepoPreviewCard({ owner, repo, repoData, onSaved }: Repo
         repoForStorage,
         user.walletAddress as `0x${string}`
       );
+      console.log('Upload result:', uploadResult);
+
+      // Create a repository object for the collection
+      const repositoryForCollection: Repository = {
+        id: repoData.id,
+        userId: 1, // Default user ID
+        name: `${owner}/${repo}`,
+        description: repoData.description || "",
+        stars: repoData.stargazers_count,
+        forks: repoData.forks_count,
+        language: repoData.language || "",
+        nftCount: 0,
+        lastUpdated: new Date(repoData.updated_at)
+      };
+
+      // Add the repository to the collection
+      const addedToCollection = await addRepositoryToCollection(
+        repositoryForCollection,
+        user.walletAddress as `0x${string}`
+      );
+
+      if (addedToCollection) {
+        console.log('Repository added to collection successfully');
+      } else {
+        console.warn('Failed to add repository to collection');
+      }
 
       toast({
         title: "Repository saved",
@@ -71,6 +98,11 @@ export default function RepoPreviewCard({ owner, repo, repoData, onSaved }: Repo
       if (onSaved) {
         onSaved(uploadResult);
       }
+      
+      // Force a hard refresh after a short delay to ensure the new data is loaded
+      setTimeout(() => {
+        window.location.href = '/repositories';
+      }, 1500);
     } catch (error: any) {
       console.error("Error saving repository to Grove:", error);
       toast({

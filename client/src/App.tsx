@@ -38,7 +38,6 @@ function Router() {
       <Route path="/add-repository" component={AddRepository} />
       <Route path="/link-github" component={LinkGitHubPage} />
       <Route path="/mint-nft" component={MintNftPage} />
-      {/* <Route path="/nft-gallery" component={NftGalleryPage} / */}
       <Route path="/social" component={Social} />
       <Route component={NotFound} />
     </Switch>

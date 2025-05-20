@@ -1,6 +1,7 @@
 // @ts-ignore
 import groveUris from "../config/grove-uris.json";
 import { storageClient } from "./groveClient";
+import { createLensAccountACL, updateJson } from "./groveClient";
 
 // Types
 export interface User {
@@ -128,6 +129,8 @@ export async function fetchUsers(): Promise<User[]> {
       console.warn('Invalid data format for users:', data);
       return []; // Return empty array instead of throwing
     }
+
+    console.log('Users:', data.users);
     
     return data.users.map((user: any) => ({
       ...user,
@@ -276,27 +279,31 @@ export async function getUserById(id: number): Promise<User | null> {
 }
 
 /**
- * Gets a user by GitHub username
+ * Gets a user by GitHub username from the Grove storage
+ * @param githubUsername The GitHub username to search for
  */
-export async function getUserByGitHubUsername(username: string): Promise<User | null> {
+export async function getUserByGitHubUsername(githubUsername: string): Promise<User | null> {
   try {
     const users = await fetchUsers();
-    return users.find(user => user.githubUsername === username) || null;
+    console.log('Users:', users);
+    const user = users.find(user => user.githubUsername === githubUsername);
+    return user || null;
   } catch (error) {
-    console.error(`Error getting user by GitHub username ${username}:`, error);
+    console.error(`Error getting user by GitHub username (${githubUsername}):`, error);
     return null;
   }
 }
 
 /**
- * Gets repositories by user ID
+ * Gets repositories by user ID from the Grove storage
+ * @param userId The user ID to filter repositories by
  */
 export async function getRepositoriesByUserId(userId: number): Promise<Repository[]> {
   try {
     const repositories = await fetchRepositories();
     return repositories.filter(repo => repo.userId === userId);
   } catch (error) {
-    console.error(`Error getting repositories for user ${userId}:`, error);
+    console.error(`Error getting repositories by user ID (${userId}):`, error);
     return [];
   }
 }
@@ -324,5 +331,250 @@ export async function getActivitiesByUserId(userId: number): Promise<Activity[]>
   } catch (error) {
     console.error(`Error getting activities for user ${userId}:`, error);
     return [];
+  }
+}
+
+/**
+ * Updates the Grove URI in the configuration file
+ * @param key The key in the grove-uris.json file to update (e.g., 'repositories', 'nfts')
+ * @param newUri The new URI to save
+ */
+export async function updateGroveUri(key: keyof typeof groveUris, newUri: string): Promise<boolean> {
+  try {
+    console.log(`Updating Grove URI for ${key} to ${newUri}`);
+    
+    // Update the in-memory URI
+    (groveUris as any)[key] = newUri;
+    
+    // Call the API to update the file on the server
+    const response = await fetch('/api/grove/uri', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ key, uri: newUri }),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error(`API error updating Grove URI: ${response.status}`, errorData);
+      return false;
+    }
+    
+    const result = await response.json();
+    console.log(`API updated Grove URI: ${result.message}`);
+    
+    // Clear cache for this URI to ensure fresh data on next fetch
+    delete cache[newUri];
+    delete cacheTimestamps[newUri];
+    
+    return true;
+  } catch (error) {
+    console.error(`Error updating Grove URI for ${key}:`, error);
+    return false;
+  }
+}
+
+/**
+ * Adds a new NFT to the existing NFT collection in Grove storage
+ * @param newNft The new NFT to add to the collection
+ * @param walletAddress The wallet address of the user adding the NFT
+ */
+export async function addNFTToCollection(newNft: NFT, walletAddress: `0x${string}`): Promise<boolean> {
+  try {
+    console.log('Adding NFT to collection:', newNft);
+    
+    // 1. Fetch current NFTs collection
+    const data = await fetchFromGrove<any>(groveUris.nfts);
+    
+    // Validate data structure
+    if (!data || !Array.isArray(data.nfts)) {
+      console.warn('Invalid data format for NFTs:', data);
+      return false;
+    }
+    
+    const nfts = data.nfts;
+    
+    // 2. Add the new NFT to the collection
+    nfts.push(newNft);
+    console.log('Updated NFT collection:', nfts);
+    
+    // 3. Upload the updated collection back to Grove
+    const updatedData = { nfts };
+    
+    // Use updateJson to update the existing URI
+    const response = await updateJson(
+      groveUris.nfts,
+      updatedData,
+      walletAddress
+    );
+    
+    console.log('Updated NFTs collection:', response);
+    
+    // Update the URI in the config if it changed
+    if (response.uri !== groveUris.nfts) {
+      await updateGroveUri('nfts', response.uri);
+    }
+    
+    // Clear cache for the NFTs URI to ensure fresh data on next fetch
+    delete cache[groveUris.nfts];
+    delete cacheTimestamps[groveUris.nfts];
+    
+    return true;
+  } catch (error) {
+    console.error('Error adding NFT to collection:', error);
+    return false;
+  }
+}
+
+/**
+ * Adds a new repository to the existing repositories collection in Grove storage
+ * @param newRepo The new repository to add to the collection
+ * @param walletAddress The wallet address of the user adding the repository
+ */
+export async function addRepositoryToCollection(newRepo: Repository, walletAddress: `0x${string}`): Promise<boolean> {
+  try {
+    console.log('Adding repository to collection:', newRepo);
+    
+    // 1. Fetch current repositories collection
+    const data = await fetchFromGrove<any>(groveUris.repositories);
+    
+    // Validate data structure
+    if (!data || !Array.isArray(data.repositories)) {
+      console.warn('Invalid data format for repositories:', data);
+      return false;
+    }
+    
+    const repositories = data.repositories;
+    
+    // 2. Add the new repository to the collection
+    repositories.push(newRepo);
+    console.log('Updated repositories collection:', repositories);
+    
+    // 3. Upload the updated collection back to Grove
+    const updatedData = { repositories };
+    
+    // Use updateJson to update the existing URI
+    const response = await updateJson(
+      groveUris.repositories,
+      updatedData,
+      walletAddress
+    );
+    
+    console.log('Updated repositories collection:', response);
+    
+    // Update the URI in the config if it changed
+    if (response.uri !== groveUris.repositories) {
+      await updateGroveUri('repositories', response.uri);
+    }
+    
+    // Clear cache for the repositories URI to ensure fresh data on next fetch
+    delete cache[groveUris.repositories];
+    delete cacheTimestamps[groveUris.repositories];
+    
+    return true;
+  } catch (error) {
+    console.error('Error adding repository to collection:', error);
+    return false;
+  }
+}
+
+/**
+ * Adds or updates a user in the users collection in Grove storage
+ * @param userData User data to add or update in the collection
+ * @param walletAddress The wallet address of the user
+ */
+export async function addUserToCollection(userData: Partial<User>, walletAddress: `0x${string}`): Promise<boolean> {
+  try {
+    console.log('Adding/updating user in collection:', userData);
+    
+    // 1. Fetch current users collection
+    const data = await fetchFromGrove<any>(groveUris.users);
+    
+    // Validate data structure
+    if (!data || !Array.isArray(data.users)) {
+      console.warn('Invalid data format for users:', data);
+      return false;
+    }
+    
+    const users = data.users;
+    
+    // 2. Check if user already exists (by wallet address or GitHub username)
+    const existingUserIndex = users.findIndex((user: User) => 
+      (userData.walletAddress && user.walletAddress === userData.walletAddress) || 
+      (userData.githubUsername && user.githubUsername === userData.githubUsername)
+    );
+    
+    if (existingUserIndex >= 0) {
+      // Update existing user
+      users[existingUserIndex] = {
+        ...users[existingUserIndex],
+        ...userData,
+        // Ensure these fields are preserved if they exist
+        id: users[existingUserIndex].id || userData.id || Date.now(),
+        walletAddress: userData.walletAddress || users[existingUserIndex].walletAddress,
+        githubUsername: userData.githubUsername || users[existingUserIndex].githubUsername,
+      };
+      console.log('Updated existing user:', users[existingUserIndex]);
+    } else {
+      // Add new user
+      const newUser: User = {
+        id: userData.id || Date.now(),
+        username: userData.username || `user_${Date.now()}`,
+        githubUsername: userData.githubUsername || null,
+        avatarUrl: userData.avatarUrl || null,
+        reputation: userData.reputation || 0,
+        password: userData.password || '',
+        walletAddress: userData.walletAddress || null,
+        bio: userData.bio || null,
+        location: userData.location || null,
+        website: userData.website || null,
+        createdAt: userData.createdAt || new Date(),
+      };
+      users.push(newUser);
+      console.log('Added new user:', newUser);
+    }
+    
+    // 3. Upload the updated collection back to Grove
+    const updatedData = { users };
+    
+    // Use updateJson to update the existing URI
+    const response = await updateJson(
+      groveUris.users,
+      updatedData,
+      walletAddress
+    );
+    
+    console.log('Updated users collection:', response);
+    
+    // Update the URI in the config if it changed
+    if (response.uri !== groveUris.users) {
+      await updateGroveUri('users', response.uri);
+    }
+    
+    // Clear cache for the users URI to ensure fresh data on next fetch
+    delete cache[groveUris.users];
+    delete cacheTimestamps[groveUris.users];
+    
+    return true;
+  } catch (error) {
+    console.error('Error adding/updating user in collection:', error);
+    return false;
+  }
+}
+
+/**
+ * Gets a repository by ID from the Grove storage
+ * @param id The ID of the repository to retrieve
+ */
+export async function getRepositoryById(id: number): Promise<Repository | null> {
+  try {
+    console.log(`Getting repository by ID: ${id}`);
+    const repositories = await fetchRepositories();
+    const repository = repositories.find(repo => repo.id === id);
+    return repository || null;
+  } catch (error) {
+    console.error(`Error getting repository by ID (${id}):`, error);
+    return null;
   }
 } 

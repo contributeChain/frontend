@@ -1,6 +1,7 @@
 import { Octokit } from '@octokit/core';
 import { createTokenClient, getAuthenticatedUser, type GitHubUser } from './githubClient';
 import { uploadJson } from './groveClient';
+import { addUserToCollection } from './grove-service';
 
 // GitHub OAuth configuration
 const GITHUB_CLIENT_ID = import.meta.env.VITE_GITHUB_CLIENT_ID || "Ov23liUYQ7DJ0ipEFRWm";
@@ -172,8 +173,31 @@ export async function linkWalletWithGitHub(
     // Store in Grove if it's an Ethereum address
     if (walletAddress.startsWith('0x') && walletAddress.length === 42) {
       try {
+        // Store individual user profile
         await storeUserProfile(profile, walletAddress as `0x${string}`);
         console.log('Successfully stored profile in Grove');
+        
+        // Add user to the users collection
+        const userData = {
+          id: Date.now(),
+          username: githubUser.login,
+          githubUsername: githubUser.login,
+          avatarUrl: githubUser.avatar_url,
+          reputation: 0,
+          password: '',  // We don't store actual passwords
+          walletAddress: walletAddress,
+          bio: githubUser.bio || null,
+          location: githubUser.location || null,
+          website: githubUser.blog || githubUser.html_url || null,
+          createdAt: new Date()
+        };
+        
+        const added = await addUserToCollection(userData, walletAddress as `0x${string}`);
+        if (added) {
+          console.log('Successfully added/updated user in Grove collection');
+        } else {
+          console.warn('Failed to add/update user in Grove collection');
+        }
       } catch (error) {
         console.warn('Failed to store in Grove, but continuing with local storage:', error);
       }

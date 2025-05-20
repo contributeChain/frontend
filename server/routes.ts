@@ -12,6 +12,7 @@ import {
 import { setupGitHubRoutes } from "./api/github";
 import { setupGitHubOAuthRoutes } from "./api/githubOAuth";
 import { setupBlockchainRoutes } from "./api/blockchain";
+import { setupGroveRoutes } from "./api/grove";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // GitHub API routes
@@ -22,6 +23,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Blockchain API routes
   setupBlockchainRoutes(app);
+  
+  // Grove API routes
+  setupGroveRoutes(app);
   
   // User routes
   app.get("/api/users", async (req: Request, res: Response) => {

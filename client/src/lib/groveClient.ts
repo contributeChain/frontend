@@ -83,4 +83,24 @@ export async function uploadNftMetadata(
   accountAddress: `0x${string}`,
 ) {
   return uploadJson(metadata, accountAddress);
+}
+
+// JSON data update helper
+export async function updateJson(
+  uri: string,
+  data: any,
+  accountAddress: `0x${string}`,
+) {
+  const acl = createLensAccountACL(accountAddress);
+  
+  try {
+    // For now, we're using a workaround since direct updateJson might not be available
+    // We'll upload the content as new and manually update the reference in our app
+    const response = await storageClient.uploadAsJson(data, { acl });
+    console.log(`Updated JSON data. Original URI: ${uri}, New URI: ${response.uri}`);
+    return response;
+  } catch (error) {
+    console.error('Error updating JSON in Grove:', error);
+    throw error;
+  }
 } 
