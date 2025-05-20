@@ -24,6 +24,8 @@ export interface Repository {
   stars: number;
   forks: number;
   language: string;
+  nftCount: number;
+  lastUpdated: Date;
 }
 
 export interface NFT {
@@ -136,11 +138,28 @@ export async function fetchTrendingDevelopers(limit: number = 5): Promise<User[]
 export async function fetchRepositories(): Promise<Repository[]> {
   try {
     const data = await fetchFromGrove<{ repositories: Repository[] }>(groveUris.repositories);
-    return data.repositories;
+    return data.repositories.map(formatRepository);
   } catch (error) {
     console.error("Error fetching repositories:", error);
     return [];
   }
+}
+
+/**
+ * Formats repository data to match expected Repository type
+ */
+function formatRepository(repo: any): Repository {
+  return {
+    id: repo.id,
+    userId: repo.userId,
+    name: repo.name,
+    description: repo.description || null,
+    stars: repo.stars || 0,
+    forks: repo.forks || 0,
+    language: repo.language || null,
+    nftCount: repo.nftCount || 0,
+    lastUpdated: repo.lastUpdated ? new Date(repo.lastUpdated) : new Date()
+  };
 }
 
 /**

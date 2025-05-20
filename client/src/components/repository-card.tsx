@@ -1,6 +1,6 @@
 import { Link } from "wouter";
-import { Repository } from "@shared/schema";
 import { formatTimeAgo } from "@/lib/utils";
+import { type Repository } from "@/lib/grove-service";
 
 interface RepositoryCardProps {
   repository: Repository;
