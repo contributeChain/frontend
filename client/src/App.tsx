@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { Switch, Route } from "wouter";
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useTheme } from "@/hooks/use-theme";
@@ -17,17 +16,13 @@ import Social from "@/pages/social";
 import NotFound from "@/pages/not-found";
 import { GitHubCallback } from "@/components/auth/GitHubCallback";
 import LinkGitHubPage from "@/pages/link-github";
-import { ConnectKitProvider } from "@/providers/ConnectKitProvider";
 import { LensProvider } from "@/providers/LensProvider";
 import { GroveProvider } from "@/providers/GroveProvider";
 import { GitHubProvider } from "@/providers/GitHubProvider";
 import { AuthProvider } from "@/providers/AuthProvider";
 import { useAuth } from "@/providers/AuthProvider";
 import MintNftPage from "./pages/mint-nft";
-import NftGalleryPage from "./pages/nft-gallery";
-
-// Create a client
-const queryClient = new QueryClient()
+import { Providers as Web3Providers } from "@/providers/Providers";
 
 function Router() {
   const { user, isAuthenticated } = useAuth();
@@ -43,10 +38,29 @@ function Router() {
       <Route path="/add-repository" component={AddRepository} />
       <Route path="/link-github" component={LinkGitHubPage} />
       <Route path="/mint-nft" component={MintNftPage} />
-      <Route path="/nft-gallery" component={NftGalleryPage} />
+      {/* <Route path="/nft-gallery" component={NftGalleryPage} / */}
       <Route path="/social" component={Social} />
       <Route component={NotFound} />
     </Switch>
+  );
+}
+
+// Create a global providers wrapper to ensure proper provider hierarchy
+function AppProviders({ children }: { children: React.ReactNode }) {
+  return (
+    <Web3Providers>
+      <LensProvider>
+        <GitHubProvider>
+          <AuthProvider>
+            <GroveProvider>
+              <TooltipProvider>
+                {children}
+              </TooltipProvider>
+            </GroveProvider>
+          </AuthProvider>
+        </GitHubProvider>
+      </LensProvider>
+    </Web3Providers>
   );
 }
 
@@ -54,27 +68,15 @@ function App() {
   const { theme, setTheme } = useTheme();
   
   return (
-    <QueryClientProvider client={queryClient}>
-      <LensProvider>
-        <ConnectKitProvider>
-          <GitHubProvider>
-            <AuthProvider>
-              <GroveProvider>
-                <TooltipProvider>
-                  <Header />
-                  <main>
-                    <Toaster />
-                    <Router />
-                  </main>
-                  <Footer />
-                  <MobileNav />
-                </TooltipProvider>
-              </GroveProvider>
-            </AuthProvider>
-          </GitHubProvider>
-        </ConnectKitProvider>
-      </LensProvider>
-    </QueryClientProvider>
+    <AppProviders>
+      <Header />
+      <main>
+        <Toaster />
+        <Router />
+      </main>
+      <Footer />
+      <MobileNav />
+    </AppProviders>
   );
 }
 
