@@ -3,20 +3,35 @@ import { useEffect, useState } from "react";
 type Theme = "dark" | "light" | "system";
 
 export function useTheme() {
-  const [theme, setTheme] = useState<Theme>(
-    () => (localStorage.getItem("theme") as Theme) || "system"
-  );
+  // Initial state with safe default that works server-side
+  const [theme, setTheme] = useState<Theme>("system");
+  const [resolvedTheme, setResolvedTheme] = useState<"dark" | "light">("dark");
 
-  const [resolvedTheme, setResolvedTheme] = useState<"dark" | "light">(() => {
-    if (theme === "system") {
-      return window.matchMedia("(prefers-color-scheme: dark)").matches
+  // Initialize theme from localStorage only on client side
+  useEffect(() => {
+    // Safe check for window to avoid SSR issues
+    if (typeof window === "undefined") return;
+    
+    const storedTheme = localStorage.getItem("theme") as Theme;
+    if (storedTheme) {
+      setTheme(storedTheme);
+    }
+    
+    // Set initial resolved theme
+    if (storedTheme === "system" || !storedTheme) {
+      const systemTheme = window.matchMedia("(prefers-color-scheme: dark)").matches
         ? "dark"
         : "light";
+      setResolvedTheme(systemTheme);
+    } else {
+      setResolvedTheme(storedTheme as "dark" | "light");
     }
-    return theme as "dark" | "light";
-  });
+  }, []);
 
   useEffect(() => {
+    // Safe check for window to avoid SSR issues
+    if (typeof window === "undefined") return;
+    
     const root = window.document.documentElement;
     
     if (theme === "system") {
@@ -37,6 +52,9 @@ export function useTheme() {
   }, [theme]);
 
   useEffect(() => {
+    // Safe check for window to avoid SSR issues
+    if (typeof window === "undefined") return;
+    
     const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
     
     const handleChange = () => {

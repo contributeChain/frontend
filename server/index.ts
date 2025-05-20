@@ -67,3 +67,7 @@ app.use((req, res, next) => {
     log(`serving on port ${port}`);
   });
 })();
+// This endpoint is now implemented in githubOAuth.ts
+// app.get("/api/github/oauth/callback", async (req, res) => {
+//   // Endpoint Implementation Here
+// });

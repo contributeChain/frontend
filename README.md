@@ -9,6 +9,8 @@ DevCred transforms GitHub contributions into NFTs on Lens Chain, allowing develo
 - [Contribution Visualization](#contribution-visualization)
 - [NFT Minting Process](#nft-minting-process)
 - [Getting Started](#getting-started)
+- [Lens Alchemy Frontend](#lens-alchemy-frontend)
+- [Grove Integration](#grove-integration)
 
 ## Overview
 
@@ -153,6 +155,47 @@ The NFT minting process uses smart contracts on Lens Chain:
 - Mint NFTs for truly significant contributions to maintain their value
 - Keep your wallet secure with best security practices
 - Regularly update your profile to reflect new achievements
+
+## Lens Alchemy Frontend
+
+This is the frontend for Lens Alchemy, a platform for Web3 developers to showcase their work and connect with others in the ecosystem.
+
+## Grove Integration
+
+The application uses Grove (Lens Protocol's decentralized storage solution) to store and retrieve data. This replaces the hardcoded mock data previously used in the application.
+
+### Setting up Grove
+
+1. Make sure you have a Lens Protocol wallet with a private key
+2. Set your private key in the environment variables:
+
+```bash
+export PRIVATE_KEY=your_private_key_here
+```
+
+### Uploading Mock Data to Grove
+
+Before running the application, you need to upload the mock data to Grove:
+
+```bash
+cd client
+npx ts-node src/scripts/grove-uploader.ts
+```
+
+This will:
+1. Upload mock users, repositories, NFTs, and activities to Grove
+2. Save the Grove URIs to `src/config/grove-uris.json`
+
+### How it Works
+
+The application uses the Grove service (`src/lib/grove-service.ts`) to fetch data from Grove storage. The service provides functions to:
+
+- Fetch trending developers
+- Search users
+- Get user profiles
+- Get repositories, NFTs, and activities
+
+All components that previously used hardcoded data now use these service functions to fetch data from Grove.
 
 ---
 

@@ -1,43 +1,44 @@
 import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
 import { Helmet } from "react-helmet";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Repository } from "@shared/schema";
 import RepositoryCard from "@/components/repository-card";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/providers/AuthProvider";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { fetchRepositories, fetchUsers, type Repository, type User } from "@/lib/grove-service";
 
 export default function Repositories() {
   const [searchQuery, setSearchQuery] = useState("");
   const [repositories, setRepositories] = useState<Repository[]>([]);
   const [filteredRepositories, setFilteredRepositories] = useState<Repository[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<string>("all");
+  const [, navigate] = useLocation();
   const { toast } = useToast();
+  const { isAuthenticated } = useAuth();
 
   useEffect(() => {
-    const fetchRepositories = async () => {
+    const fetchData = async () => {
       setIsLoading(true);
       
       try {
-        const response = await fetch('/api/repositories');
+        // Fetch repositories and users from Grove
+        const [reposData, usersData] = await Promise.all([
+          fetchRepositories(),
+          fetchUsers()
+        ]);
         
-        if (response.ok) {
-          const data = await response.json();
-          setRepositories(data);
-          setFilteredRepositories(data);
-        } else {
-          toast({
-            title: "Error",
-            description: "Failed to load repositories",
-            variant: "destructive"
-          });
-        }
+        setRepositories(reposData);
+        setFilteredRepositories(reposData);
+        setUsers(usersData);
       } catch (error) {
         console.error("Error fetching repositories:", error);
         toast({
           title: "Error",
-          description: "Failed to load repositories. Please try again later.",
+          description: "Failed to load data from Grove. Please try again later.",
           variant: "destructive"
         });
       } finally {
@@ -45,7 +46,7 @@ export default function Repositories() {
       }
     };
     
-    fetchRepositories();
+    fetchData();
   }, [toast]);
 
   useEffect(() => {
@@ -90,42 +91,24 @@ export default function Repositories() {
     setFilter(newFilter);
   };
 
-  // Placeholder data if API failed
-  const ensureRepositories = filteredRepositories.length > 0 ? filteredRepositories : [
-    {
-      id: 1,
-      userId: 1,
-      name: "blockchain-auth-system",
-      description: "An OAuth-compatible authentication system built on blockchain technology for secure, decentralized identity verification.",
-      stars: 248,
-      forks: 56,
-      language: "JavaScript",
-      nftCount: 24,
-      lastUpdated: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000) // 3 days ago
-    },
-    {
-      id: 2,
-      userId: 1,
-      name: "react-performance-toolkit",
-      description: "A collection of performance optimization tools and components for React applications with a focus on rendering speed.",
-      stars: 1200,
-      forks: 184,
-      language: "TypeScript",
-      nftCount: 36,
-      lastUpdated: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000) // 1 day ago
-    },
-    {
-      id: 3,
-      userId: 1,
-      name: "defi-dashboard-components",
-      description: "A suite of React components specifically designed for DeFi applications with real-time data visualization.",
-      stars: 845,
-      forks: 92,
-      language: "TypeScript",
-      nftCount: 18,
-      lastUpdated: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000) // 5 days ago
+  const handleAddRepository = () => {
+    if (!isAuthenticated) {
+      toast({
+        title: "Authentication Required",
+        description: "Please connect your wallet to add a repository",
+        variant: "destructive"
+      });
+      return;
     }
-  ];
+    
+    navigate("/add-repository");
+  };
+
+  // Find the username for a repository based on userId
+  const getUsernameForRepository = (userId: number): string => {
+    const user = users.find(user => user.id === userId);
+    return user ? user.username : `User ${userId}`;
+  };
 
   return (
     <>
@@ -143,6 +126,14 @@ export default function Repositories() {
             </div>
             
             <div className="flex gap-3 w-full md:w-auto">
+              <Button 
+                onClick={handleAddRepository}
+                className="bg-primary hover:bg-primary/90 text-white"
+              >
+                <i className="fas fa-plus mr-2"></i>
+                Add Repository
+              </Button>
+              
               <div className="relative flex-1 md:flex-none">
                 <form onSubmit={handleSearch}>
                   <Input 
@@ -192,17 +183,17 @@ export default function Repositories() {
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {ensureRepositories.map((repository) => (
-                  <RepositoryCard 
-                    key={repository.id} 
-                    repository={repository} 
-                    username={repository.userId === 1 ? "Sarah Chen" : `User ${repository.userId}`} 
-                  />
-                ))}
-              </div>
-              
-              {ensureRepositories.length === 0 && (
+              {filteredRepositories.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredRepositories.map((repository) => (
+                    <RepositoryCard 
+                      key={repository.id} 
+                      repository={repository} 
+                      username={getUsernameForRepository(repository.userId)} 
+                    />
+                  ))}
+                </div>
+              ) : (
                 <div className="bg-white dark:bg-gray-800 rounded-xl p-8 text-center">
                   <i className="fas fa-search text-4xl text-gray-400 mb-4"></i>
                   <h3 className="text-xl font-display font-bold mb-2">No repositories found</h3>
@@ -212,7 +203,7 @@ export default function Repositories() {
                 </div>
               )}
               
-              {ensureRepositories.length > 0 && (
+              {filteredRepositories.length > 9 && (
                 <div className="mt-10 flex justify-center">
                   <Button 
                     variant="outline"
