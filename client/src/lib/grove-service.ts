@@ -1,5 +1,6 @@
 // @ts-ignore
 import groveUris from "../config/grove-uris.json";
+import { storageClient } from "./groveClient";
 
 // Types
 export interface User {
@@ -77,18 +78,32 @@ const isCacheValid = (key: string): boolean => {
  */
 async function fetchFromGrove<T>(uri: string): Promise<T> {
   try {
+    console.log('Fetching from Grove:', uri);
+    
     // Check cache first
     if (cache[uri] && isCacheValid(uri)) {
       return cache[uri] as T;
     }
     
+    // Resolve lens:// URI to a web URL
+    let resolvedUrl: string;
+    if (uri.startsWith('lens://')) {
+      // Use StorageClient to resolve lens:// URI
+      resolvedUrl = storageClient.resolve(uri);
+      console.log('Resolved URL:', resolvedUrl);
+    } else {
+      resolvedUrl = uri;
+    }
+    
     // Fetch data from Grove
-    const response = await fetch(uri);
+    const response = await fetch(resolvedUrl);
+    console.log('Response:', response);
     if (!response.ok) {
       throw new Error(`Failed to fetch data: ${response.status} ${response.statusText}`);
     }
     
     const data = await response.json() as T;
+    console.log('Data:', data);
     
     // Update cache
     cache[uri] = data;
@@ -106,8 +121,15 @@ async function fetchFromGrove<T>(uri: string): Promise<T> {
  */
 export async function fetchUsers(): Promise<User[]> {
   try {
-    const data = await fetchFromGrove<{ users: User[] }>(groveUris.users);
-    return data.users.map(user => ({
+    const data = await fetchFromGrove<any>(groveUris.users);
+    
+    // Validate data structure 
+    if (!data || !Array.isArray(data.users)) {
+      console.warn('Invalid data format for users:', data);
+      return []; // Return empty array instead of throwing
+    }
+    
+    return data.users.map((user: any) => ({
       ...user,
       createdAt: user.createdAt ? new Date(user.createdAt as unknown as string) : null
     }));
@@ -137,7 +159,14 @@ export async function fetchTrendingDevelopers(limit: number = 5): Promise<User[]
  */
 export async function fetchRepositories(): Promise<Repository[]> {
   try {
-    const data = await fetchFromGrove<{ repositories: Repository[] }>(groveUris.repositories);
+    const data = await fetchFromGrove<any>(groveUris.repositories);
+    
+    // Validate data structure
+    if (!data || !Array.isArray(data.repositories)) {
+      console.warn('Invalid data format for repositories:', data);
+      return []; // Return empty array instead of throwing
+    }
+    
     return data.repositories.map(formatRepository);
   } catch (error) {
     console.error("Error fetching repositories:", error);
@@ -167,8 +196,15 @@ function formatRepository(repo: any): Repository {
  */
 export async function fetchNFTs(): Promise<NFT[]> {
   try {
-    const data = await fetchFromGrove<{ nfts: NFT[] }>(groveUris.nfts);
-    return data.nfts.map(nft => ({
+    const data = await fetchFromGrove<any>(groveUris.nfts);
+    
+    // Validate data structure
+    if (!data || !Array.isArray(data.nfts)) {
+      console.warn('Invalid data format for NFTs:', data);
+      return []; // Return empty array instead of throwing
+    }
+    
+    return data.nfts.map((nft: any) => ({
       ...nft,
       mintedAt: new Date(nft.mintedAt as unknown as string)
     }));
@@ -183,8 +219,15 @@ export async function fetchNFTs(): Promise<NFT[]> {
  */
 export async function fetchActivities(): Promise<Activity[]> {
   try {
-    const data = await fetchFromGrove<{ activities: Activity[] }>(groveUris.activities);
-    return data.activities.map(activity => ({
+    const data = await fetchFromGrove<any>(groveUris.activities);
+    
+    // Validate data structure
+    if (!data || !Array.isArray(data.activities)) {
+      console.warn('Invalid data format for activities:', data);
+      return []; // Return empty array instead of throwing
+    }
+    
+    return data.activities.map((activity: any) => ({
       ...activity,
       activity: {
         ...activity.activity,
