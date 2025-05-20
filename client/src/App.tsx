@@ -14,40 +14,22 @@ import Explore from "@/pages/explore";
 import Repositories from "@/pages/repositories";
 import Social from "@/pages/social";
 import NotFound from "@/pages/not-found";
-import { getCurrentWalletAddress } from "@/lib/web3-utils";
-import { isGitHubConnected, getConnectedGitHubUsername } from "@/lib/github-utils";
+import GitHubCallback from "@/components/auth/GitHubCallback";
+import { ConnectKitProvider } from "@/providers/ConnectKitProvider";
+import { LensProvider } from "@/providers/LensProvider";
+import { GroveProvider } from "@/providers/GroveProvider";
+import { GitHubProvider } from "@/providers/GitHubProvider";
+import { AuthProvider } from "@/providers/AuthProvider";
+import { useAuth } from "@/providers/AuthProvider";
 
 function Router() {
-  const [walletAddress, setWalletAddress] = useState<string | null>(null);
-  const [githubConnected, setGithubConnected] = useState<boolean>(false);
-  const [githubUsername, setGithubUsername] = useState<string | null>(null);
-  
-  useEffect(() => {
-    // Check if wallet is connected
-    const checkWalletConnection = async () => {
-      const address = await getCurrentWalletAddress();
-      setWalletAddress(address);
-    };
-    
-    // Check if GitHub is connected
-    const checkGitHubConnection = async () => {
-      const isConnected = await isGitHubConnected();
-      setGithubConnected(isConnected);
-      
-      if (isConnected) {
-        const username = await getConnectedGitHubUsername();
-        setGithubUsername(username);
-      }
-    };
-    
-    checkWalletConnection();
-    checkGitHubConnection();
-  }, []);
+  const { user, isAuthenticated } = useAuth();
   
   return (
     <Switch>
       <Route path="/" component={Home} />
-      <Route path="/profile/:username?">{params => <Profile username={params.username || githubUsername} />}</Route>
+      <Route path="/auth/callback" component={GitHubCallback} />
+      <Route path="/profile/:username?">{params => <Profile username={params.username || user?.githubUser?.login} />}</Route>
       <Route path="/explore" component={Explore} />
       <Route path="/repositories" component={Repositories} />
       <Route path="/social" component={Social} />
@@ -61,15 +43,25 @@ function App() {
   
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Header />
-        <main>
-          <Toaster />
-          <Router />
-        </main>
-        <Footer />
-        <MobileNav />
-      </TooltipProvider>
+      <LensProvider>
+        <ConnectKitProvider>
+          <GitHubProvider>
+            <AuthProvider>
+              <GroveProvider>
+                <TooltipProvider>
+                  <Header />
+                  <main>
+                    <Toaster />
+                    <Router />
+                  </main>
+                  <Footer />
+                  <MobileNav />
+                </TooltipProvider>
+              </GroveProvider>
+            </AuthProvider>
+          </GitHubProvider>
+        </ConnectKitProvider>
+      </LensProvider>
     </QueryClientProvider>
   );
 }
