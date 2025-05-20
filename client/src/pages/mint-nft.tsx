@@ -22,22 +22,38 @@ import {
 } from "@/lib/nft-service";
 import { addNFTToCollection } from "@/lib/grove-service";
 
+// Define the steps of the NFT minting process
+enum MintStep {
+  REPOSITORY_INFO = 0,
+  CONTRIBUTOR_INFO = 1,
+  CONTRIBUTION_STATS = 2,
+  GENERATE_METADATA = 3,
+  MINT_NFT = 4,
+  COMPLETE = 5
+}
+
 export default function MintNftPage() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const { address, isConnected } = useAccount();
   const { user, isAuthenticated } = useAuth();
   
+  // Current step in the minting process
+  const [currentStep, setCurrentStep] = useState<MintStep>(MintStep.REPOSITORY_INFO);
+  
   // Repository info
   const [owner, setOwner] = useState("");
   const [repo, setRepo] = useState("");
   const [repoUrl, setRepoUrl] = useState("");
+  const [isValidRepo, setIsValidRepo] = useState(false);
   
   // GitHub user info
   const [contributor, setContributor] = useState<string | undefined>(
     user?.githubUser?.login || undefined
   );
   const [contributorData, setContributorData] = useState<any>(null);
+  const [isLoadingContributor, setIsLoadingContributor] = useState(false);
+  const [contributorError, setContributorError] = useState<string | null>(null);
   
   // Contribution stats
   const [contributionStats, setContributionStats] = useState<ContributionStatsData | null>(null);
@@ -49,6 +65,7 @@ export default function MintNftPage() {
   // UI states
   const [isGenerating, setIsGenerating] = useState(false);
   const [isMinting, setIsMinting] = useState(false);
+  const [isAddingToGrove, setIsAddingToGrove] = useState(false);
   const [mintingSuccess, setMintingSuccess] = useState(false);
   const [mintingError, setMintingError] = useState<string | null>(null);
   const [transactionHash, setTransactionHash] = useState<string | null>(null);
@@ -67,18 +84,30 @@ export default function MintNftPage() {
   // Parse repository URL into owner and repo
   const handleRepositoryUrlChange = (url: string) => {
     setRepoUrl(url);
+    setIsValidRepo(false);
     
     // Extract owner and repo from URL
     const match = url.match(/github\.com\/([^\/]+)\/([^\/]+)/);
     if (match && match.length === 3) {
       setOwner(match[1]);
       setRepo(match[2].replace(/\.git$/, ""));
+      setIsValidRepo(true);
+      if (currentStep === MintStep.REPOSITORY_INFO) {
+        setCurrentStep(MintStep.CONTRIBUTOR_INFO);
+      }
     } else {
       // Try owner/repo format
       const simpleMatch = url.match(/^([^\/]+)\/([^\/]+)$/);
       if (simpleMatch && simpleMatch.length === 3) {
         setOwner(simpleMatch[1]);
         setRepo(simpleMatch[2].replace(/\.git$/, ""));
+        setIsValidRepo(true);
+        if (currentStep === MintStep.REPOSITORY_INFO) {
+          setCurrentStep(MintStep.CONTRIBUTOR_INFO);
+        }
+      } else {
+        setOwner("");
+        setRepo("");
       }
     }
   };
@@ -88,16 +117,28 @@ export default function MintNftPage() {
     const fetchContributorData = async () => {
       if (!contributor) return;
       
+      setIsLoadingContributor(true);
+      setContributorError(null);
+      
       try {
         const userData = await getUserProfile(contributor);
         setContributorData(userData);
-      } catch (error) {
+        
+        if (currentStep === MintStep.CONTRIBUTOR_INFO) {
+          setCurrentStep(MintStep.CONTRIBUTION_STATS);
+        }
+      } catch (error: any) {
         console.error("Error fetching contributor data:", error);
+        setContributorError(error.message || "Failed to fetch contributor data");
+      } finally {
+        setIsLoadingContributor(false);
       }
     };
     
-    fetchContributorData();
-  }, [contributor]);
+    if (contributor) {
+      fetchContributorData();
+    }
+  }, [contributor, currentStep]);
   
   // Handle contribution stats loaded
   const handleStatsLoaded = (stats: ContributionStatsData) => {
@@ -121,6 +162,10 @@ export default function MintNftPage() {
         }
       );
       setNftImageUrl(imageUrl);
+      
+      if (currentStep === MintStep.CONTRIBUTION_STATS) {
+        setCurrentStep(MintStep.GENERATE_METADATA);
+      }
     }
   };
   
@@ -157,6 +202,8 @@ export default function MintNftPage() {
         title: "NFT Metadata Generated",
         description: "Your NFT metadata has been created and stored on Grove"
       });
+      
+      setCurrentStep(MintStep.MINT_NFT);
     } catch (error: any) {
       console.error("Error generating NFT metadata:", error);
       toast({
@@ -193,6 +240,8 @@ export default function MintNftPage() {
       );
       
       if (result.success) {
+        setTransactionHash(result.transactionHash || null);
+        
         // Create NFT object to add to collection
         const nftData = {
           id: Date.now(), // Generate a unique ID
@@ -219,17 +268,36 @@ export default function MintNftPage() {
         };
         
         // Add NFT to Grove collection
-        const addedToGrove = await addNFTToCollection(nftData, address as `0x${string}`);
-        if (addedToGrove) {
-          console.log('NFT added to Grove collection successfully');
-        } else {
-          console.warn('Failed to add NFT to Grove collection');
+        setIsAddingToGrove(true);
+        try {
+          const addedToGrove = await addNFTToCollection(nftData, address as `0x${string}`);
+          if (addedToGrove) {
+            console.log('NFT added to Grove collection successfully');
+            toast({
+              title: "NFT Added to Collection",
+              description: "Your NFT has been added to the Grove collection"
+            });
+          } else {
+            console.warn('Failed to add NFT to Grove collection');
+            toast({
+              title: "Warning",
+              description: "NFT was minted but couldn't be added to the Grove collection",
+              variant: "warning"
+            });
+          }
+        } catch (error: any) {
+          console.error("Error adding NFT to Grove collection:", error);
+          toast({
+            title: "Warning",
+            description: "NFT was minted but couldn't be added to the Grove collection: " + (error.message || "Unknown error"),
+            variant: "warning"
+          });
+        } finally {
+          setIsAddingToGrove(false);
         }
         
         setMintingSuccess(true);
-        if (result.transactionHash) {
-          setTransactionHash(result.transactionHash);
-        }
+        setCurrentStep(MintStep.COMPLETE);
         
         toast({
           title: "NFT Minted Successfully",
@@ -264,6 +332,11 @@ export default function MintNftPage() {
   // Check if all required information is available
   const hasRequiredInfo = owner && repo && contributorData;
   
+  // Get progress percentage for the stepper
+  const getProgressPercentage = () => {
+    return (currentStep / MintStep.COMPLETE) * 100;
+  };
+  
   return (
     <>
       <Helmet>
@@ -279,6 +352,23 @@ export default function MintNftPage() {
               <p className="text-gray-600 dark:text-gray-400">
                 Create an on-chain credential for your GitHub contributions
               </p>
+              
+              {/* Progress bar */}
+              <div className="mt-6 mb-8">
+                <div className="w-full bg-gray-200 dark:bg-gray-700 h-2 rounded-full overflow-hidden">
+                  <div 
+                    className="bg-primary h-full transition-all duration-300 ease-in-out"
+                    style={{ width: `${getProgressPercentage()}%` }}
+                  ></div>
+                </div>
+                <div className="flex justify-between mt-2 text-xs text-gray-500">
+                  <span>Repository</span>
+                  <span>Contributor</span>
+                  <span>Stats</span>
+                  <span>Generate</span>
+                  <span>Mint</span>
+                </div>
+              </div>
             </div>
             
             {!isConnected && (
@@ -306,9 +396,13 @@ export default function MintNftPage() {
             
             <div className="space-y-8">
               {/* Step 1: Repository Information */}
-              <Card>
+              <Card className={currentStep >= MintStep.REPOSITORY_INFO ? "border-primary/50" : ""}>
                 <CardHeader>
-                  <CardTitle>Step 1: Repository Information</CardTitle>
+                  <CardTitle className="text-lg flex items-center">
+                    <span className="w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center text-sm mr-2">1</span>
+                    Repository Information
+                    {isValidRepo && <span className="ml-2 text-green-500"><i className="fas fa-check"></i></span>}
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
@@ -330,29 +424,53 @@ export default function MintNftPage() {
                         <p className="font-medium">Repository: {owner}/{repo}</p>
                       </div>
                     )}
+                    
+                    {!isValidRepo && repoUrl && (
+                      <Alert variant="destructive">
+                        <AlertDescription>
+                          Invalid repository format. Please use "owner/repo" or "https://github.com/owner/repo"
+                        </AlertDescription>
+                      </Alert>
+                    )}
                   </div>
                 </CardContent>
               </Card>
               
               {/* Step 2: Contributor Information */}
-              <Card>
+              <Card 
+                className={currentStep >= MintStep.CONTRIBUTOR_INFO ? "border-primary/50" : "opacity-70"}
+              >
                 <CardHeader>
-                  <CardTitle>Step 2: Contributor Information</CardTitle>
+                  <CardTitle className="text-lg flex items-center">
+                    <span className="w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center text-sm mr-2">2</span>
+                    Contributor Information
+                    {contributorData && <span className="ml-2 text-green-500"><i className="fas fa-check"></i></span>}
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
                     <div>
                       <Label htmlFor="contributor">GitHub Username</Label>
-                      <Input
-                        id="contributor"
-                        placeholder="GitHub username"
-                        value={contributor || ""}
-                        onChange={(e) => setContributor(e.target.value || undefined)}
-                      />
+                      <div className="flex gap-2">
+                        <Input
+                          id="contributor"
+                          placeholder="GitHub username"
+                          value={contributor || ""}
+                          onChange={(e) => setContributor(e.target.value || undefined)}
+                          disabled={!isValidRepo || isLoadingContributor}
+                        />
+                        {isLoadingContributor && <Spinner size="sm" />}
+                      </div>
                       <p className="text-sm text-gray-500 mt-1">
                         Enter the GitHub username of the contributor (defaults to your linked GitHub account)
                       </p>
                     </div>
+                    
+                    {contributorError && (
+                      <Alert variant="destructive">
+                        <AlertDescription>{contributorError}</AlertDescription>
+                      </Alert>
+                    )}
                     
                     {contributorData && (
                       <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg flex items-center gap-4">
@@ -373,9 +491,13 @@ export default function MintNftPage() {
               
               {/* Step 3: Contribution Statistics */}
               {hasRequiredInfo && (
-                <Card>
+                <Card className={currentStep >= MintStep.CONTRIBUTION_STATS ? "border-primary/50" : "opacity-70"}>
                   <CardHeader>
-                    <CardTitle>Step 3: Contribution Statistics</CardTitle>
+                    <CardTitle className="text-lg flex items-center">
+                      <span className="w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center text-sm mr-2">3</span>
+                      Contribution Statistics
+                      {contributionStats && <span className="ml-2 text-green-500"><i className="fas fa-check"></i></span>}
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <ContributionStats 
@@ -390,9 +512,13 @@ export default function MintNftPage() {
               
               {/* Step 4: Generate and Mint NFT */}
               {contributionStats && contributorData && (
-                <Card>
+                <Card className={currentStep >= MintStep.GENERATE_METADATA ? "border-primary/50" : "opacity-70"}>
                   <CardHeader>
-                    <CardTitle>Step 4: Generate and Mint NFT</CardTitle>
+                    <CardTitle className="text-lg flex items-center">
+                      <span className="w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center text-sm mr-2">4</span>
+                      Generate and Mint NFT
+                      {mintingSuccess && <span className="ml-2 text-green-500"><i className="fas fa-check"></i></span>}
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -404,7 +530,7 @@ export default function MintNftPage() {
                           contributionStats={contributionStats}
                           contributionScore={contributionStats.score}
                           imageUrl={nftImageUrl}
-                          isMinting={isMinting}
+                          isMinting={isGenerating || isMinting || isAddingToGrove}
                           onMint={metadataUri ? handleMintNft : handleGenerateNft}
                         />
                       </div>
@@ -421,7 +547,7 @@ export default function MintNftPage() {
                             {!metadataUri && (
                               <Button 
                                 onClick={handleGenerateNft} 
-                                disabled={isGenerating || !contributionStats || !address}
+                                disabled={isGenerating || !contributionStats || !address || currentStep < MintStep.GENERATE_METADATA}
                                 className="w-full"
                               >
                                 {isGenerating ? (
@@ -441,13 +567,18 @@ export default function MintNftPage() {
                             {metadataUri && !mintingSuccess && (
                               <Button 
                                 onClick={handleMintNft} 
-                                disabled={isMinting || !address}
+                                disabled={isMinting || isAddingToGrove || !address || currentStep < MintStep.MINT_NFT}
                                 className="w-full"
                               >
                                 {isMinting ? (
                                   <>
                                     <Spinner size="sm" className="mr-2" />
                                     Minting NFT...
+                                  </>
+                                ) : isAddingToGrove ? (
+                                  <>
+                                    <Spinner size="sm" className="mr-2" />
+                                    Adding to Grove Collection...
                                   </>
                                 ) : (
                                   <>
