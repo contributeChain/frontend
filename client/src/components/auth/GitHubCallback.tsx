@@ -1,235 +1,152 @@
 import { useEffect, useState, useRef } from 'react';
 import { useLocation } from 'wouter';
-import { useGitHub } from '@/providers/GitHubProvider';
-import { useAuth } from '@/providers/AuthProvider';
-import { Spinner } from '@/components/ui/spinner';
 import { useToast } from '@/hooks/use-toast';
+import { useAuthStore, useGitHubStore } from '@/store';
 import axios from 'axios';
-import { Octokit } from '@octokit/core';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Spinner } from '@/components/ui/spinner';
+import { useAccount } from 'wagmi';
 
 export function GitHubCallback() {
-  const { login } = useGitHub();
-  const { linkGithubWithWallet } = useAuth();
-  const [, setLocation] = useLocation();
-  const { toast } = useToast();
+  const [isProcessing, setIsProcessing] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [status, setStatus] = useState<string>('Connecting to GitHub...');
-  // Add a ref to track if we've already processed the code
-  const codeProcessed = useRef(false);
+  const [location, setLocation] = useLocation();
+  const { toast } = useToast();
+  const { address, isConnected } = useAccount();
+  
+  // Use Zustand stores instead of context
+  const updateUserWithGitHub = useAuthStore((state) => state.updateUserWithGitHub);
+  const githubLogin = useGitHubStore((state) => state.login);
+  
+  const hasProcessedCode = useRef(false);
   
   useEffect(() => {
-    const handleCallback = async () => {
-      // If we've already processed this code, don't try again
-      if (codeProcessed.current) {
+    const handleGitHubCallback = async () => {
+      // Prevent duplicated processing
+      if (hasProcessedCode.current) return;
+      
+      // Extract code from URL parameters
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get('code');
+      const errorParam = params.get('error');
+      
+      // Mark as processed immediately to prevent duplicate attempts
+      hasProcessedCode.current = true;
+      
+      // Check if there was an error in the GitHub redirect
+      if (errorParam) {
+        console.error('GitHub auth error:', errorParam);
+        setError('GitHub authentication was denied or failed');
+        setIsProcessing(false);
         return;
       }
 
-      // Parse the URL for the authorization code
-      const searchParams = new URLSearchParams(window.location.search);
-      const code = searchParams.get('code');
-      
+      // Ensure we have a code and a connected wallet
       if (!code) {
-        setError('No authorization code received');
-        toast({
-          variant: 'destructive',
-          title: 'Authentication Failed',
-          description: 'No authorization code received from GitHub',
-        });
-        setTimeout(() => setLocation('/'), 3000);
+        setError('No authorization code received from GitHub');
+        setIsProcessing(false);
         return;
       }
       
-      // Mark this code as being processed to prevent duplicate requests
-      codeProcessed.current = true;
+      if (!isConnected || !address) {
+        setError('Wallet connection required. Please connect your wallet first.');
+        setIsProcessing(false);
+        return;
+      }
       
       try {
-        setStatus('Exchanging code for access token...');
-        console.log('Exchanging code for access token');
-        
-        // First, exchange the code for an access token via our server
+        // Exchange code for access token via our server endpoint - only once
+        console.log("Exchanging authorization code for token...");
         const response = await axios.get(`/api/github/oauth/callback?code=${code}`);
         
-        console.log('Server response:', {
-          status: response.status,
-          hasData: !!response.data,
-          hasToken: !!response.data?.access_token,
-          tokenType: typeof response.data?.access_token,
-          tokenValue: response.data?.access_token ? 
-                     `${String(response.data.access_token).substring(0, 5)}...` : 
-                     'none',
-          dataKeys: response.data ? Object.keys(response.data) : [],
-          fullData: JSON.stringify(response.data)
-        });
-        
-        if (response.data.error) {
-          throw new Error(`Server error: ${response.data.error}`);
+        if (response.status !== 200 || !response.data.access_token) {
+          throw new Error('Failed to exchange code for token');
         }
         
-        // Extract and handle the token with extensive validation
-        const { access_token } = response.data;
+        console.log("Token received successfully, updating user profile...");
         
-        if (access_token === undefined || access_token === null) {
-          console.error('No access token received from server');
-          throw new Error('No access token received from server');
-        }
+        // First authenticate with GitHub
+        await githubLogin(response.data.access_token);
         
-        // Use different methods to try to convert the token to a string
-        let tokenStr;
-        try {
-          // Direct to string conversion
-          tokenStr = '' + access_token;
-          console.log('Token after direct string conversion:', {
-            value: tokenStr.substring(0, 5) + '...',
-            type: typeof tokenStr,
-            length: tokenStr.length
-          });
-        } catch (e) {
-          console.error('Error in direct string conversion:', e);
-          
-          // Fallback to String constructor
-          try {
-            tokenStr = String(access_token);
-            console.log('Token after String() conversion:', {
-              value: tokenStr.substring(0, 5) + '...',
-              type: typeof tokenStr,
-              length: tokenStr.length
-            });
-          } catch (e2) {
-            console.error('Error in String() conversion:', e2);
-            
-            // Last resort - JSON stringify if it's an object
-            if (typeof access_token === 'object') {
-              try {
-                tokenStr = JSON.stringify(access_token);
-                console.log('Token after JSON.stringify conversion:', {
-                  value: tokenStr.substring(0, 5) + '...',
-                  type: typeof tokenStr,
-                  length: tokenStr.length
-                });
-              } catch (e3) {
-                console.error('Error in JSON.stringify conversion:', e3);
-                throw new Error('Failed to convert token to string in any way');
-              }
-            } else {
-              throw new Error(`Cannot convert token of type ${typeof access_token} to string`);
-            }
-          }
-        }
+        // Then link the wallet with GitHub user using the token
+        await updateUserWithGitHub(response.data.access_token, address);
         
-        if (!tokenStr || tokenStr.trim() === '') {
-          console.error('Empty token after conversion');
-          throw new Error('Empty token after conversion');
-        }
-        
-        setStatus('Authenticating with GitHub...');
-        console.log('Access token received, authenticating with GitHub');
-        
-        // Use the access token to authenticate with GitHub
-        console.log('Logging in with GitHub');
-        console.log('Token:', tokenStr);
-        
-        let githubUserData;
-        
-        try {
-          // Try the regular login flow
-          await login(tokenStr);
-        } catch (loginError) {
-          console.error('Error during login, trying alternative approach:', loginError);
-          
-          // If login fails, try direct authentication with GitHub
-          try {
-            // Create a direct Octokit instance
-            const octokit = new Octokit({
-              auth: tokenStr
-            });
-            
-            // Verify it works by fetching the user
-            const { data: user } = await octokit.request('GET /user');
-            console.log('Successfully authenticated directly with GitHub:', user.login);
-            
-            // Save user data for later use
-            githubUserData = user;
-            
-            // Store the token
-            localStorage.setItem('github_token', tokenStr);
-            
-            // Continue with the app flow - this will use the stored token on next page
-            console.log('Direct authentication successful, continuing workflow');
-          } catch (directAuthError) {
-            console.error('Even direct authentication failed:', directAuthError);
-            throw loginError; // Throw the original error
-          }
-        }
-        
-        // Wait a moment to ensure GitHub provider state is updated
-        setStatus('Linking GitHub with wallet...');
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        console.log('GitHub authentication successful, linking with wallet');
-        
-        try {
-          // Link GitHub account with the connected wallet
-          await linkGithubWithWallet();
-        } catch (linkError) {
-          console.error('Error linking with wallet, will try to continue anyway:', linkError);
-          // We'll still try to continue even if linking fails
-          // This is because the GitHub authentication was successful
-        }
-        
+        // Show success toast
         toast({
-          title: 'GitHub Connected',
-          description: 'Your GitHub account has been successfully linked to your wallet',
+          title: 'GitHub Account Linked',
+          description: 'Your GitHub account has been successfully connected.',
+          variant: 'default',
         });
         
-        // Get the redirect URL from state or default to profile
-        const state = searchParams.get('state');
-        const redirectPath = state ? decodeURIComponent(state) : '/profile';
+        // Redirect to the saved path or profile page
+        const redirectPath = localStorage.getItem('post_github_auth_redirect') || '/profile';
+        localStorage.removeItem('post_github_auth_redirect'); // Clean up
         
-        // Replace the URL to remove the code from the history and prevent resubmission
-        window.history.replaceState({}, document.title, window.location.pathname);
-        
-        setStatus('Redirecting to profile...');
-        // Redirect to the appropriate page
+        // Use a slight delay to ensure state updates complete
+        setTimeout(() => {
         setLocation(redirectPath);
-      } catch (err: any) {
-        console.error('GitHub authentication error:', err);
-        const errMessage = err.response?.data?.message || err.message || 'Unknown error';
-        setError(`Failed to authenticate with GitHub: ${errMessage}`);
-        toast({
-          variant: 'destructive',
-          title: 'Authentication Failed',
-          description: `Failed to connect your GitHub account: ${errMessage}`,
-        });
-        
-        // Replace the URL to remove the code from the history 
-        window.history.replaceState({}, document.title, window.location.pathname);
-        
-        setTimeout(() => setLocation('/'), 3000);
+        }, 100);
+      } catch (error) {
+        console.error('Error processing GitHub callback:', error);
+        setError('Failed to link GitHub account. Please try again.');
+        setIsProcessing(false);
       }
     };
-
-    handleCallback();
-  }, [login, linkGithubWithWallet, setLocation, toast]);
-
-  if (error) {
+    
+    // Only run if we're on the callback route and haven't processed yet
+    if (!hasProcessedCode.current) {
+      handleGitHubCallback();
+    }
+  }, [isConnected, address, updateUserWithGitHub, githubLogin, setLocation, toast]);
+  
+  const handleRetry = () => {
+    setLocation('/github/link');
+  };
+  
+  if (isProcessing) {
     return (
-      <div className="flex flex-col items-center justify-center h-[calc(100vh-4rem)] p-4">
-        <div className="text-destructive text-xl font-bold mb-4">Authentication Error</div>
-        <p className="text-center mb-6">{error}</p>
-        <p className="text-center text-sm text-muted-foreground">
-          Redirecting to home page...
-        </p>
+      <div className="flex flex-col items-center justify-center min-h-[60vh] p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle>Connecting GitHub</CardTitle>
+            <CardDescription>Linking your GitHub account with your wallet...</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col items-center py-8">
+            <Spinner className="h-10 w-10 text-primary" />
+            <p className="mt-4 text-center text-muted-foreground">
+              Please wait while we securely connect your GitHub account.
+            </p>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
-  return (
-    <div className="flex flex-col items-center justify-center h-[calc(100vh-4rem)] p-4">
-      <Spinner className="h-12 w-12 mb-4" />
-      <h2 className="text-xl font-bold mb-2">{status}</h2>
-      <p className="text-center text-muted-foreground mb-6">
-        Please wait while we link your GitHub account with your wallet.
-      </p>
-    </div>
-  );
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] p-4">
+        <Card className="w-full max-w-md border-destructive">
+          <CardHeader>
+            <CardTitle className="text-destructive">Connection Failed</CardTitle>
+            <CardDescription>
+              We encountered an issue while connecting your GitHub account
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="bg-destructive/10 p-4 rounded-md">
+              <p className="text-sm text-destructive">{error}</p>
+            </div>
+          </CardContent>
+          <CardFooter>
+            <Button onClick={handleRetry} className="w-full">
+              Try Again
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
+    );
+  }
+
+  return null; // Should never reach here as we're either processing or have an error
 } 

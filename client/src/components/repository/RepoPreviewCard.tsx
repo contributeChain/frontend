@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/providers/AuthProvider";
+import { useAuth } from "@/hooks/use-auth";
 import { uploadJson } from "@/lib/groveClient";
 import { GitHubRepository } from "@/lib/githubClient";
 import { addRepositoryToCollection, type Repository } from "@/lib/grove-service";

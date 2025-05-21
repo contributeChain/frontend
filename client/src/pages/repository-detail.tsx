@@ -6,7 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
 import { Container } from "@/components/layout/container";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/providers/AuthProvider";
+import { useAuth } from "@/hooks/use-auth";
 import { getRepository, getRepositoryContributions, GitHubRepository } from "@/lib/githubClient";
 import { getRepositoryById, Repository } from "@/lib/grove-service";
 

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Helmet } from "react-helmet";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/providers/AuthProvider";
+import { useAuth } from "@/hooks/use-auth";
 import { Container } from "@/components/layout/container";
 import RepoUrlInput from "@/components/repository/RepoUrlInput";
 import RepoPreviewCard from "@/components/repository/RepoPreviewCard";

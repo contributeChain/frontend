@@ -4,8 +4,8 @@ import { useTheme } from "@/hooks/use-theme";
 import WalletConnectButton from "@/components/wallet-connect-button";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/providers/AuthProvider";
 import { useAccount } from "wagmi";
+import { useAuthStore, useGitHubStore } from "@/store";
 import {
   Sheet,
   SheetContent,
@@ -23,13 +23,29 @@ import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbS
 import { Menu, Search, X, ChevronDown, Home, Github, Code, Sun, Moon, Plus, User, LogOut, Settings, Blocks } from "lucide-react";
 
 export default function Header() {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const { theme, setTheme, resolvedTheme } = useTheme();
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const { isConnected } = useAccount();
-  const { user, isAuthenticated, connectGitHub, logout } = useAuth();
+  
+  // Use Zustand stores instead of context
+  const user = useAuthStore((state) => state.user);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const logout = useAuthStore((state) => state.logout);
+  const githubLogout = useGitHubStore((state) => state.logout);
+  
+  // Combined logout function
+  const handleLogout = () => {
+    logout();
+    githubLogout();
+  };
+  
+  // Function to navigate to GitHub link page
+  const navigateToGitHubLink = () => {
+    setLocation("/github/link");
+  };
 
   // Navigation items - simplified to the most important ones
   const navItems = [
@@ -111,15 +127,14 @@ export default function Header() {
             {/* Desktop Navigation - compact */}
             <nav className="hidden md:flex md:items-center md:space-x-1 mr-2">
               {navItems.map((item) => (
-                <Link key={item.path} href={item.path}>
-                  <a className={`px-3 py-1.5 text-xs font-medium rounded-md flex items-center gap-1.5 transition-all ${
+                <Link key={item.path} href={item.path} 
+                  className={`px-3 py-1.5 text-xs font-medium rounded-md flex items-center gap-1.5 transition-all ${
                     location === item.path
                       ? "bg-primary/10 text-primary"
                       : "text-foreground/70 hover:bg-muted hover:text-foreground"
                   }`}>
-                    {item.icon}
-                    {item.label}
-                  </a>
+                  {item.icon}
+                  {item.label}
                 </Link>
               ))}
             </nav>
@@ -166,7 +181,7 @@ export default function Header() {
                   <Link href="/social">Social</Link>
                 </DropdownMenuItem>
                 {isConnected && !isAuthenticated && (
-                  <DropdownMenuItem onClick={connectGitHub}>
+                  <DropdownMenuItem onClick={navigateToGitHubLink}>
                     <Github size={14} className="mr-2" />
                     Connect GitHub
                   </DropdownMenuItem>
@@ -229,14 +244,14 @@ export default function Header() {
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={logout} className="flex items-center text-red-500">
+                  <DropdownMenuItem onClick={handleLogout} className="flex items-center text-red-500">
                     <LogOut size={14} className="mr-2" />
                     Logout
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              <div className="hidden xs:block">
+              <div className="block">
                 <WalletConnectButton size="sm" />
               </div>
             )}
@@ -269,15 +284,14 @@ export default function Header() {
                       { path: "/social", label: "Social", icon: <User size={16} /> }
                     ].map((item) => (
                       <SheetClose key={item.path} asChild>
-                        <Link href={item.path}>
-                          <a className={`px-3 py-2 text-sm font-medium rounded-md flex items-center gap-2 ${
+                        <Link href={item.path} 
+                          className={`px-3 py-2 text-sm font-medium rounded-md flex items-center gap-2 ${
                             location === item.path
                               ? "bg-primary/10 text-primary" 
                               : "hover:bg-muted"
                           }`}>
-                            {item.icon}
-                            {item.label}
-                          </a>
+                          {item.icon}
+                          {item.label}
                         </Link>
                       </SheetClose>
                     ))}
@@ -288,7 +302,7 @@ export default function Header() {
                       <SheetClose asChild>
                         <Button 
                           variant="outline"
-                          onClick={connectGitHub}
+                          onClick={navigateToGitHubLink}
                           className="w-full flex items-center justify-center gap-2 text-sm h-9"
                           size="sm"
                         >

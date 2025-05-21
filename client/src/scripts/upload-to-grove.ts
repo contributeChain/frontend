@@ -2,7 +2,6 @@
 
 import { StorageClient } from "@lens-chain/storage-client";
 import { lensAccountOnly } from "@lens-chain/storage-client";
-import { chains } from "@lens-chain/sdk/viem";
 import { createWalletClient, http } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { polygon } from "viem/chains";

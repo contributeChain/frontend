@@ -1,21 +1,78 @@
-import { getDefaultProvider, Network } from "@lens-chain/sdk/ethers";
-import { StorageClient } from "@lens-chain/storage-client";
-import { ethers } from "ethers";
-import { type Chain } from "wagmi/chains";
+import { PublicClient, testnet, mainnet, evmAddress } from '@lens-protocol/client';
+import { signMessageWith } from '@lens-protocol/client/viem';
+import { fetchAccountsAvailable } from '@lens-protocol/client/actions';
+import { getLensAppAddress, DEFAULT_NETWORK, NetworkEnvironment } from '@/config/contracts';
 
-// Initialize Lens Chain provider (L2)
-export const lensProvider = getDefaultProvider(Network.Testnet);
+// Initialize Lens client with environment based on configuration
+export const lensClient = PublicClient.create({
+  environment: DEFAULT_NETWORK === 'mainnet' ? mainnet : testnet,
+  storage: localStorage, // Use localStorage to persist authentication
+});
 
-// Initialize Ethereum L1 provider (using Sepolia for testnet)
-export const ethProvider = ethers.getDefaultProvider("sepolia");
+// Helper function to authenticate with Lens
+export async function authenticateWithLens(walletAddress: string, signer: any) {
+  try {
+    // Get app address from config based on current environment
+    const appAddress = getLensAppAddress();
+    
+    // Authenticate as an Account Owner
+    const authenticated = await lensClient.login({
+      accountOwner: {
+        owner: evmAddress(walletAddress),
+        account: evmAddress(walletAddress),
+        // Use configured app address for the current environment
+        app: evmAddress(appAddress),
+      },
+      signMessage: signMessageWith(signer),
+    });
 
-// Initialize Grove storage client
-export const storageClient = StorageClient.create();
+    if (authenticated.isErr()) {
+      console.error("Authentication error:", authenticated.error);
+      return { success: false, error: authenticated.error };
+    }
+
+    // Store the authenticated session client
+    const sessionClient = authenticated.value;
+    return { success: true, sessionClient };
+  } catch (error) {
+    console.error("Error authenticating with Lens:", error);
+    return { success: false, error };
+  }
+}
+
+// Check if user has a lens profile
+export async function checkLensProfile(walletAddress: string) {
+  try {
+    if (!walletAddress) {
+      return { success: false, hasProfile: false, error: "No wallet address provided" };
+    }
+
+    const result = await fetchAccountsAvailable(lensClient, {
+      managedBy: evmAddress(walletAddress),
+      includeOwned: true,
+    });
+
+    if (result.isErr()) {
+      return { success: false, hasProfile: false, error: result.error };
+    }
+
+    // If we get accounts back, the user has at least one profile
+    const accounts = result.value.items;
+    return { 
+      success: true, 
+      hasProfile: accounts.length > 0, 
+      accounts: accounts 
+    };
+  } catch (error) {
+    console.error("Error checking Lens profile:", error);
+    return { success: false, hasProfile: false, error };
+  }
+}
 
 // Export network configuration
-export const networkConfig: Chain = {
-  id: 37111,
-  name: "Lens Chain Testnet",
+export const networkConfig = {
+  id: DEFAULT_NETWORK === 'mainnet' ? 37110 : 37111,
+  name: DEFAULT_NETWORK === 'mainnet' ? "Lens Chain" : "Lens Chain Testnet",
   nativeCurrency: {
     name: "GRASS",
     symbol: "GRASS",
@@ -23,16 +80,16 @@ export const networkConfig: Chain = {
   },
   rpcUrls: {
     default: { 
-      http: ["https://testnet.lens.dev"] 
+      http: [DEFAULT_NETWORK === 'mainnet' ? "https://rpc.lens.dev" : "https://testnet.lens.dev"] 
     },
     public: { 
-      http: ["https://testnet.lens.dev"] 
+      http: [DEFAULT_NETWORK === 'mainnet' ? "https://rpc.lens.dev" : "https://testnet.lens.dev"] 
     }
   },
   blockExplorers: {
     default: {
       name: "Lens Explorer",
-      url: "https://testnet-explorer.lens.dev"
+      url: DEFAULT_NETWORK === 'mainnet' ? "https://explorer.lens.dev" : "https://testnet-explorer.lens.dev"
     }
   }
 };

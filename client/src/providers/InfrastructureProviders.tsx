@@ -12,11 +12,7 @@ import {
 import { http } from 'wagmi';
 import '@rainbow-me/rainbowkit/styles.css';
 import { networkConfig } from '@/lib/lensClient';
-import { LensProvider } from './LensProvider';
-import { AuthProvider } from './AuthProvider';
-import { GitHubProvider } from './GitHubProvider';
 import { HelmetProvider } from 'react-helmet-async';
-import { GroveProvider } from './GroveProvider';
 
 // Create a client for tanstack query
 const queryClient = new QueryClient();
@@ -38,25 +34,17 @@ const config = getDefaultConfig({
   },
 });
 
-interface ProvidersProps {
+interface InfrastructureProvidersProps {
   children: ReactNode;
 }
 
-export function Providers({ children }: ProvidersProps) {
+export function InfrastructureProviders({ children }: InfrastructureProvidersProps) {
   return (
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
         <RainbowKitProvider>
           <HelmetProvider>
-            <GitHubProvider>
-              <AuthProvider>
-                <LensProvider>
-                  <GroveProvider>
-                    {children}
-                  </GroveProvider>
-                </LensProvider>
-              </AuthProvider>
-            </GitHubProvider>
+            {children}
           </HelmetProvider>
         </RainbowKitProvider>
       </QueryClientProvider>

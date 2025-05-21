@@ -11,16 +11,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
-import { useAuth } from "@/providers/AuthProvider";
+import { useAuth } from "@/hooks/use-auth";
 import { ContributionStats, ContributionStatsData } from "@/components/nft/ContributionStats";
 import { NftPreviewCard } from "@/components/nft/NftPreviewCard";
 import { getUserProfile } from "@/lib/githubClient";
 import { 
   createNftMetadata, 
-  generateNftImageUrl, 
   mintContributionNft 
 } from "@/lib/nft-service";
 import { addNFTToCollection } from "@/lib/grove-service";
+import { alchemyService } from "@/lib/alchemyService";
 
 // Define the steps of the NFT minting process
 enum MintStep {
@@ -61,6 +61,7 @@ export default function MintNftPage() {
   // NFT metadata
   const [nftImageUrl, setNftImageUrl] = useState<string>("");
   const [metadataUri, setMetadataUri] = useState<string>("");
+  const [rarityTier, setRarityTier] = useState<{ name: string; color: string } | null>(null);
   
   // UI states
   const [isGenerating, setIsGenerating] = useState(false);
@@ -144,22 +145,18 @@ export default function MintNftPage() {
   const handleStatsLoaded = (stats: ContributionStatsData) => {
     setContributionStats(stats);
     
-    // Generate NFT image URL
+    // Calculate rarity tier and generate NFT image URL using alchemy service
     if (contributorData && owner && repo) {
-      const imageUrl = generateNftImageUrl(
+      // Calculate rarity tier based on score
+      const tier = alchemyService.calculateRarityTier(stats.score);
+      setRarityTier(tier);
+      
+      // Generate enhanced NFT image URL with new service
+      const imageUrl = alchemyService.generateEnhancedNftImage(
         repo,
         contributorData.name || contributorData.login,
         stats.score,
-        { 
-          name: stats.score >= 1000 ? "Legendary" :
-                stats.score >= 500 ? "Epic" :
-                stats.score >= 200 ? "Rare" :
-                stats.score >= 50 ? "Uncommon" : "Common",
-          color: stats.score >= 1000 ? "#FF8C00" :
-                 stats.score >= 500 ? "#9932CC" :
-                 stats.score >= 200 ? "#1E90FF" :
-                 stats.score >= 50 ? "#32CD32" : "#808080"
-        }
+        tier
       );
       setNftImageUrl(imageUrl);
       
@@ -184,6 +181,19 @@ export default function MintNftPage() {
     setMintingError(null);
     
     try {
+      // Create enhanced metadata with additional attributes
+      const enhancedAttributes = [
+        { trait_type: "Repository", value: `${owner}/${repo}` },
+        { trait_type: "Contributor", value: contributorData.login },
+        { trait_type: "Contribution Score", value: contributionStats.score.toString() },
+        { trait_type: "Commits", value: contributionStats.commits.toString() },
+        { trait_type: "Pull Requests", value: contributionStats.pullRequests.toString() },
+        { trait_type: "Additions", value: contributionStats.additions.toString() },
+        { trait_type: "Deletions", value: contributionStats.deletions.toString() },
+        { trait_type: "Issues", value: contributionStats.issues.toString() },
+        { trait_type: "Rarity", value: rarityTier?.name || "Common" }
+      ];
+      
       const result = await createNftMetadata(
         repo,
         `https://github.com/${owner}/${repo}`,
@@ -193,7 +203,8 @@ export default function MintNftPage() {
           avatar_url: contributorData.avatar_url
         },
         contributionStats,
-        address as `0x${string}`
+        address as `0x${string}`,
+        enhancedAttributes
       );
       
       setMetadataUri(result.uploadResult.uri);
@@ -250,10 +261,7 @@ export default function MintNftPage() {
           name: `${repo} Contribution`,
           description: `Contribution to ${owner}/${repo} by ${contributor}`,
           imageUrl: nftImageUrl,
-          rarity: contributionStats.score >= 1000 ? "legendary" :
-                  contributionStats.score >= 500 ? "epic" :
-                  contributionStats.score >= 200 ? "rare" :
-                  contributionStats.score >= 50 ? "uncommon" : "common",
+          rarity: (rarityTier?.name || 'common').toLowerCase(),
           repoName: `${owner}/${repo}`,
           mintedAt: new Date(),
           transactionHash: result.transactionHash || "",
@@ -263,7 +271,9 @@ export default function MintNftPage() {
             additions: contributionStats.additions,
             deletions: contributionStats.deletions,
             pullRequests: contributionStats.pullRequests,
-            issues: contributionStats.issues
+            issues: contributionStats.issues,
+            rarityTier: rarityTier?.name || "Common",
+            rarityColor: rarityTier?.color || "#808080"
           }
         };
         
@@ -282,7 +292,7 @@ export default function MintNftPage() {
             toast({
               title: "Warning",
               description: "NFT was minted but couldn't be added to the Grove collection",
-              variant: "warning"
+              variant: "destructive"
             });
           }
         } catch (error: any) {
@@ -290,7 +300,7 @@ export default function MintNftPage() {
           toast({
             title: "Warning",
             description: "NFT was minted but couldn't be added to the Grove collection: " + (error.message || "Unknown error"),
-            variant: "warning"
+            variant: "destructive"
           });
         } finally {
           setIsAddingToGrove(false);
@@ -532,6 +542,7 @@ export default function MintNftPage() {
                           imageUrl={nftImageUrl}
                           isMinting={isGenerating || isMinting || isAddingToGrove}
                           onMint={metadataUri ? handleMintNft : handleGenerateNft}
+                          rarityTier={rarityTier}
                         />
                       </div>
                       
@@ -542,6 +553,18 @@ export default function MintNftPage() {
                             This NFT represents your contributions to the {owner}/{repo} repository.
                             It will be permanently stored on the blockchain as proof of your work.
                           </p>
+                          
+                          {/* Display rarity information */}
+                          {rarityTier && (
+                            <div className="mb-4 p-4 rounded-lg" style={{ backgroundColor: `${rarityTier.color}20` }}>
+                              <h4 className="text-md font-semibold mb-1" style={{ color: rarityTier.color }}>
+                                {rarityTier.name} Rarity
+                              </h4>
+                              <p className="text-sm text-gray-600 dark:text-gray-400">
+                                This contribution NFT has a score of {contributionStats.score}, qualifying it as a {rarityTier.name.toLowerCase()} level NFT.
+                              </p>
+                            </div>
+                          )}
                           
                           <div className="space-y-4">
                             {!metadataUri && (

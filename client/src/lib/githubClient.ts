@@ -6,7 +6,9 @@ const GITHUB_CLIENT_ID = import.meta.env.VITE_GITHUB_CLIENT_ID ?? "Ov23liUYQ7DJ0
 const GITHUB_CLIENT_SECRET = import.meta.env.VITE_GITHUB_CLIENT_SECRET  ?? "d4171172b8b43bd513b6c4bae65fb88a88186c41";
 
 // Initialize base Octokit instance
-export const octokit = new Octokit();
+export const octokit = new Octokit({
+  auth: import.meta.env.VITE_GITHUB_AUTH_TOKEN ?? "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"
+});
 
 // Initialize token-authenticated Octokit instance
 export function createTokenClient(token: any) {

@@ -15,6 +15,7 @@
     "@jridgewell/trace-mapping": "^0.3.25",
     "@lens-chain/sdk": "^1.0.3",
     "@lens-chain/storage-client": "^1.0.4",
+    "@lens-protocol/client": "0.0.0-canary-20250515092635",
     "@neondatabase/serverless": "^0.10.4",
     "@octokit/auth-oauth-user": "^5.1.4",
     "@octokit/auth-token": "^5.1.2",
@@ -89,7 +90,8 @@
     "ws": "^8.18.0",
     "zksync-ethers": "^6.17.0",
     "zod": "^3.24.2",
-    "zod-validation-error": "^3.4.0"
+    "zod-validation-error": "^3.4.0",
+    "zustand": "^5.0.4"
   },
   "devDependencies": {
     "@replit/vite-plugin-cartographer": "^0.2.0",
@@ -107,6 +109,7 @@
     "@types/react-helmet": "^6.1.11",
     "@types/ws": "^8.5.13",
     "@vitejs/plugin-react": "^4.3.2",
+    "alchemy-sdk": "^3.5.9",
     "autoprefixer": "^10.4.20",
     "drizzle-kit": "^0.30.4",
     "esbuild": "^0.25.0",

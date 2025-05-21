@@ -11,7 +11,7 @@ import RecentActivity from "@/components/profile/recent-activity";
 import { fetchGitHubUser } from "@/lib/github-utils";
 import { getCurrentWalletAddress, shortenAddress } from "@/lib/web3-utils";
 import { getUserByGitHubUsername, getRepositoriesByUserId, addUserToCollection } from "@/lib/grove-service";
-import { useAuth } from "@/providers/AuthProvider";
+import { useAuth } from "@/hooks/use-auth";
 
 interface ProfileProps {
   username?: string | null;
