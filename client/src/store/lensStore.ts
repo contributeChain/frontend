@@ -15,7 +15,7 @@ export const useLensStore = create<LensState>()(
   (set, get) => ({
     hasProfile: null,
     isAuthenticated: false,
-    isLoading: true,
+    isLoading: false,
     
     checkAuth: async (address: string | undefined) => {
       if (!address) {
@@ -32,11 +32,15 @@ export const useLensStore = create<LensState>()(
       try {
         // Check if the user is already authenticated
         const resumed = await lensClient.resumeSession();
-        set({ isAuthenticated: resumed.isOk() });
+        const isAuthenticated = resumed.isOk();
         
         // Check if the user has a Lens profile
         const profileResult = await checkLensProfile(address);
-        set({ hasProfile: profileResult.hasProfile });
+        
+        set({ 
+          isAuthenticated,
+          hasProfile: profileResult.hasProfile 
+        });
       } catch (error) {
         console.error("Error checking Lens authentication:", error);
         set({ isAuthenticated: false });
@@ -57,6 +61,11 @@ export const useLensStore = create<LensState>()(
         
         if (authResult.success) {
           set({ isAuthenticated: true });
+          
+          // After successful auth, check for profile
+          const profileResult = await checkLensProfile(address);
+          set({ hasProfile: profileResult.hasProfile });
+          
           return true;
         } else {
           return false;
@@ -70,6 +79,8 @@ export const useLensStore = create<LensState>()(
     },
     
     logout: async (): Promise<void> => {
+      set({ isLoading: true });
+      
       try {
         // Clear the session from storage
         localStorage.removeItem('lens.session.key');
@@ -79,6 +90,8 @@ export const useLensStore = create<LensState>()(
         set({ isAuthenticated: false });
       } catch (error) {
         console.error("Error logging out from Lens:", error);
+      } finally {
+        set({ isLoading: false });
       }
     }
   })

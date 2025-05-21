@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { useGitHubStore } from '@/store';
 import { Button } from '@/components/ui/button';
@@ -28,18 +28,37 @@ export interface GitHubProfilePreviewProps {
 }
 
 export function GitHubProfilePreview({ onConfirm }: GitHubProfilePreviewProps) {
-  const { user, disconnectGitHub } = useAuth();
-  const gitHubAuth = useGitHubStore(state => ({ 
-    user: state.user,
-    logout: state.logout 
-  }));
+  const { user, disconnectGitHub, github } = useAuth();
   const { toast } = useToast();
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [isDisconnecting, setIsDisconnecting] = useState(false);
+  
+  // Combined GitHub user data from both stores
+  const combinedGitHubUser = user?.githubUser || github.user;
+  
+  // Load repositories if they're not yet loaded
+  useEffect(() => {
+    if (combinedGitHubUser && !github.repositories) {
+      github.fetchRepositories();
+    }
+  }, [combinedGitHubUser, github]);
+  
+  // Handle redirection after disconnection
+  useEffect(() => {
+    if (isDisconnecting && !combinedGitHubUser) {
+      // GitHub user has been successfully disconnected, redirect if needed
+      setIsDisconnecting(false);
+      
+      if (onConfirm) {
+        // After disconnection complete, trigger onConfirm to redirect
+        setTimeout(() => {
+          onConfirm();
+        }, 300);
+      }
+    }
+  }, [isDisconnecting, combinedGitHubUser, onConfirm]);
 
-  // Check both auth store and GitHub store for user data
-  const githubUser = user?.githubUser || gitHubAuth.user;
-
-  if (!githubUser) {
+  if (!combinedGitHubUser) {
     return (
       <Card>
         <CardHeader>
@@ -51,25 +70,32 @@ export function GitHubProfilePreview({ onConfirm }: GitHubProfilePreviewProps) {
   }
 
   // Cast to the extended interface to handle optional properties
-  const extendedGithubUser = githubUser as ExtendedGitHubUser;
+  const extendedGithubUser = combinedGitHubUser as ExtendedGitHubUser;
   
-  const handleDisconnect = () => {
-    // Call both logout functions to ensure complete cleanup
+  const handleDisconnect = useCallback(() => {
+    setIsDisconnecting(true);
+    
+    // Call the disconnectGitHub function from the auth hook
     disconnectGitHub();
-    gitHubAuth.logout();
     
     toast({
       title: "GitHub Disconnected",
       description: "Your GitHub account has been disconnected from your wallet",
     });
+    
     setShowConfirmDialog(false);
-  };
+  }, [disconnectGitHub, toast]);
 
-  const handleConfirm = () => {
+  const handleConfirm = useCallback(() => {
     if (onConfirm) {
       onConfirm();
     }
-  };
+  }, [onConfirm]);
+
+  // Get repository count from either user data or loaded repositories
+  const repoCount = github.repositories 
+    ? github.repositories.length 
+    : extendedGithubUser.public_repos || 0;
 
   // Get wallet address from user or fallback
   const walletAddress = user?.walletAddress || "Unknown wallet";
@@ -144,7 +170,7 @@ export function GitHubProfilePreview({ onConfirm }: GitHubProfilePreviewProps) {
 
         <div className="grid grid-cols-3 gap-4 mt-4 border-t border-b py-4">
           <div className="text-center">
-            <div className="text-2xl font-bold">{extendedGithubUser.public_repos || 0}</div>
+            <div className="text-2xl font-bold">{repoCount}</div>
             <div className="text-xs text-muted-foreground">Repositories</div>
           </div>
           <div className="text-center border-x">

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { connectGitHub } from "@/lib/github-utils";
+import { getGitHubAuthUrl } from "@/lib/auth-service";
 
 export default function BottomCTA() {
   const { toast } = useToast();
@@ -10,21 +10,15 @@ export default function BottomCTA() {
   const handleConnectGitHub = async () => {
     setIsConnecting(true);
     try {
-      const result = await connectGitHub();
+      // Redirect to GitHub OAuth flow
+      window.location.href = getGitHubAuthUrl();
       
-      if (result.success) {
-        toast({
-          title: "GitHub Connected!",
-          description: `Successfully connected GitHub account: ${result.username}`,
-          variant: "default",
-        });
-      } else {
-        toast({
-          title: "Connection Failed",
-          description: "Unable to connect GitHub account. Please try again.",
-          variant: "destructive",
-        });
-      }
+      // Show toast notification (this might not be visible due to the redirect)
+      toast({
+        title: "Redirecting to GitHub",
+        description: "Please complete the GitHub authorization process",
+        variant: "default",
+      });
     } catch (error) {
       console.error("Error connecting GitHub:", error);
       toast({
@@ -32,7 +26,6 @@ export default function BottomCTA() {
         description: "An error occurred while connecting to GitHub.",
         variant: "destructive",
       });
-    } finally {
       setIsConnecting(false);
     }
   };

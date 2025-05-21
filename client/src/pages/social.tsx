@@ -6,10 +6,10 @@ import TrendingDevelopers from "@/components/social/trending-developers";
 import PopularNFTs from "@/components/social/popular-nfts";
 import PopularTags from "@/components/social/popular-tags";
 import { useToast } from "@/hooks/use-toast";
-import { lensService } from "@/services/lens";
+import { lensService, PageSize } from "@/services/lens";
 import { LensPostMetadata } from "@/types/lens";
 import LensPostForm from "@/components/lens-post-form";
-import { useAccount } from "wagmi";
+import { useAccount, useConnect } from "wagmi";
 import { useLens } from "@/hooks/use-lens";
 import { 
   Alert,
@@ -17,11 +17,15 @@ import {
   AlertDescription 
 } from "@/components/ui/alert";
 import { Activity, User } from "@/lib/grove-service";
+import WalletConnectButton from "@/components/wallet-connect-button";
 
 export default function Social() {
   const [activities, setActivities] = useState<{activity: Activity, user: User}[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<string>("all");
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const { toast } = useToast();
   const { isConnected } = useAccount();
   const { hasProfile } = useLens();
@@ -30,18 +34,34 @@ export default function Social() {
   const isGuestMode = !isConnected || hasProfile === false;
 
   useEffect(() => {
-    fetchActivities();
+    fetchActivities(true);
   }, []);
 
-  const fetchActivities = async () => {
-    setIsLoading(true);
+  const fetchActivities = async (reset = false) => {
+    if (reset) {
+      setIsLoading(true);
+    } else {
+      setLoadingMore(true);
+    }
     
     try {
       // Use Lens service to fetch posts from the Lens Protocol
-      const result = await lensService.fetchFeed(20);
+      // If reset is true, fetch from the beginning, otherwise use the cursor
+      const result = await lensService.fetchFeed(
+        PageSize.Ten,
+        reset ? null : cursor
+      );
       
       if (result.success) {
-        setActivities(result.posts);
+        if (reset) {
+          setActivities(result.posts);
+        } else {
+          setActivities(prev => [...prev, ...result.posts]);
+        }
+        
+        // Update cursor and hasMore state
+        setCursor(result.cursor);
+        setHasMore(result.hasMore);
       } else {
         toast({
           title: "Error",
@@ -58,11 +78,45 @@ export default function Social() {
       });
     } finally {
       setIsLoading(false);
+      setLoadingMore(false);
     }
   };
 
   const handleFilterChange = (newFilter: string) => {
     setFilter(newFilter);
+  };
+
+  // Show loading skeletons
+  const renderLoadingSkeletons = () => {
+    return Array(3).fill(0).map((_, index) => (
+      <ActivityCard
+        key={`skeleton-${index}`}
+        activity={{
+          activity: {
+            id: 0,
+            userId: 0,
+            type: "lens_post",
+            description: "",
+            createdAt: new Date(),
+            metadata: {}
+          }
+        } as Activity}
+        user={{
+          id: 0,
+          username: "",
+          githubUsername: "",
+          avatarUrl: "",
+          password: "",
+          reputation: 0,
+          walletAddress: "",
+          bio: "",
+          location: "",
+          website: "",
+          createdAt: new Date()
+        }}
+        isLoading={true}
+      />
+    ));
   };
 
   const filteredActivities = activities.filter(item => {
@@ -120,35 +174,60 @@ export default function Social() {
           <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
             <div className="flex items-center gap-2 flex-wrap">
               <Button 
-                onClick={() => handleFilterChange("all")}
+                onClick={() => {
+                  handleFilterChange("all");
+                  // Reset feed when changing filters
+                  setCursor(null);
+                  fetchActivities(true);
+                }}
                 className={`text-sm px-3 py-1 rounded-full ${filter === "all" ? "bg-primary text-white" : "bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-400"}`}
                 variant="ghost"
               >
                 All
               </Button>
               <Button 
-                onClick={() => handleFilterChange("nft_mints")}
+                onClick={() => {
+                  handleFilterChange("nft_mints");
+                  // Reset feed when changing filters
+                  setCursor(null);
+                  fetchActivities(true);
+                }}
                 className={`text-sm px-3 py-1 rounded-full ${filter === "nft_mints" ? "bg-primary text-white" : "bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-400"}`}
                 variant="ghost"
               >
                 NFT Mints
               </Button>
               <Button 
-                onClick={() => handleFilterChange("achievements")}
+                onClick={() => {
+                  handleFilterChange("achievements");
+                  // Reset feed when changing filters
+                  setCursor(null);
+                  fetchActivities(true);
+                }}
                 className={`text-sm px-3 py-1 rounded-full ${filter === "achievements" ? "bg-primary text-white" : "bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-400"}`}
                 variant="ghost"
               >
                 Achievements
               </Button>
               <Button 
-                onClick={() => handleFilterChange("contributions")}
+                onClick={() => {
+                  handleFilterChange("contributions");
+                  // Reset feed when changing filters
+                  setCursor(null);
+                  fetchActivities(true);
+                }}
                 className={`text-sm px-3 py-1 rounded-full ${filter === "contributions" ? "bg-primary text-white" : "bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-400"}`}
                 variant="ghost"
               >
                 Contributions
               </Button>
               <Button 
-                onClick={() => handleFilterChange("lens_posts")}
+                onClick={() => {
+                  handleFilterChange("lens_posts");
+                  // Reset feed when changing filters
+                  setCursor(null);
+                  fetchActivities(true);
+                }}
                 className={`text-sm px-3 py-1 rounded-full ${filter === "lens_posts" ? "bg-primary text-white" : "bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-400"}`}
                 variant="ghost"
               >
@@ -157,12 +236,7 @@ export default function Social() {
             </div>
             
             {isGuestMode && (
-              <Button variant="default" className="text-sm">
-                <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
-                </svg>
-                Connect Wallet
-              </Button>
+              <WalletConnectButton />
             )}
           </div>
           
@@ -172,9 +246,9 @@ export default function Social() {
                 <LensPostForm />
               </div>
               
-              {isLoading ? (
-                <div className="flex justify-center items-center h-64">
-                  <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+              {isLoading && activities.length === 0 ? (
+                <div className="space-y-6">
+                  {renderLoadingSkeletons()}
                 </div>
               ) : (
                 <>
@@ -191,10 +265,13 @@ export default function Social() {
                       </p>
                     </div>
                   ) : (
-                    <>
+                    <div className="space-y-6">
                       {filteredActivities.map(({ activity, user }) => (
                         <ActivityCard key={activity.activity.id} activity={activity} user={user} />
                       ))}
+                      
+                      {/* Show loading skeletons when loading more */}
+                      {loadingMore && renderLoadingSkeletons()}
                       
                       {isGuestMode && filteredActivities.length > 0 && (
                         <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 mt-4">
@@ -213,7 +290,7 @@ export default function Social() {
                           </div>
                         </div>
                       )}
-                    </>
+                    </div>
                   )}
                   
                   {filteredActivities.length > 0 && (
@@ -221,11 +298,22 @@ export default function Social() {
                       <Button 
                         variant="outline"
                         className="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-darkText dark:text-lightText font-medium py-2 px-6 rounded-lg border border-gray-200 dark:border-gray-700 flex items-center gap-2"
-                        onClick={fetchActivities}
-                        disabled={isLoading}
+                        onClick={() => fetchActivities(false)}
+                        disabled={isLoading || loadingMore || !hasMore}
                       >
-                        <span>{isLoading ? 'Loading...' : 'Load More'}</span>
-                        {isLoading ? null : <i className="fas fa-chevron-down"></i>}
+                        {loadingMore ? (
+                          <>
+                            <span>Loading more posts...</span>
+                            <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin ml-2"></div>
+                          </>
+                        ) : !hasMore ? (
+                          <span>No more posts</span>
+                        ) : (
+                          <>
+                            <span>Load More</span>
+                            <i className="fas fa-chevron-down"></i>
+                          </>
+                        )}
                       </Button>
                     </div>
                   )}

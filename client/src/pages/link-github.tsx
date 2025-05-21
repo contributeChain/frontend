@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo, useCallback } from 'react';
 import { useLocation } from 'wouter';
 import { Helmet } from 'react-helmet-async';
 import { useAccount } from 'wagmi';
@@ -12,19 +12,32 @@ import { GitHubProfilePreview } from '@/components/profile/GitHubProfilePreview'
 export default function LinkGitHubPage() {
   const { address, isConnected } = useAccount();
   const { user, isAuthenticated } = useAuth();
-  const gitHubAuth = useGitHubStore(state => ({ 
-    isAuthenticated: state.isAuthenticated,
-    user: state.user 
-  }));
+  
+  // Use useMemo to prevent unnecessary re-renders
+  const gitHubAuth = useMemo(() => {
+    const state = useGitHubStore.getState();
+    return { 
+      isAuthenticated: state.isAuthenticated,
+      user: state.user 
+    };
+  }, []); // Empty dependency array since we only need it once on mount
+  
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
   
-  // If already authenticated with GitHub, redirect to profile
+  const handleComplete = useCallback(() => {
+    setLocation('/profile');
+  }, [setLocation]);
+  
+  // Check for GitHub connection only once on mount or when auth state changes
   useEffect(() => {
+    // Get current values directly from the store to avoid stale closures
+    const { isAuthenticated: gitHubIsAuthenticated, user: gitHubUser } = useGitHubStore.getState();
+    
     // Check both auth store and GitHub store authentication state
     const hasGitHubConnected = 
       (isAuthenticated && user?.githubUser) || 
-      (gitHubAuth.isAuthenticated && gitHubAuth.user);
+      (gitHubIsAuthenticated && gitHubUser);
     
     if (hasGitHubConnected) {
       toast({
@@ -33,11 +46,7 @@ export default function LinkGitHubPage() {
       });
       setLocation('/profile');
     }
-  }, [isAuthenticated, user, gitHubAuth.isAuthenticated, gitHubAuth.user, setLocation, toast]);
-  
-  const handleComplete = () => {
-    setLocation('/profile');
-  };
+  }, [isAuthenticated, user, setLocation, toast]);
   
   return (
     <>

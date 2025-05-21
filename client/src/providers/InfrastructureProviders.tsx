@@ -13,6 +13,7 @@ import { http } from 'wagmi';
 import '@rainbow-me/rainbowkit/styles.css';
 import { networkConfig } from '@/lib/lensClient';
 import { HelmetProvider } from 'react-helmet-async';
+import LensProvider from './LensProvider';
 
 // Create a client for tanstack query
 const queryClient = new QueryClient();
@@ -44,7 +45,9 @@ export function InfrastructureProviders({ children }: InfrastructureProvidersPro
       <QueryClientProvider client={queryClient}>
         <RainbowKitProvider>
           <HelmetProvider>
-            {children}
+            <LensProvider>
+              {children}
+            </LensProvider>
           </HelmetProvider>
         </RainbowKitProvider>
       </QueryClientProvider>

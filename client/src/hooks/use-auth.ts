@@ -11,7 +11,6 @@ export function useAuth() {
   const updateUser = useAuthStore((state) => state.updateUser);
   const connectGitHub = useAuthStore((state) => state.connectGitHub);
   const updateUserWithGitHub = useAuthStore((state) => state.updateUserWithGitHub);
-  const githubLogout = useGitHubStore((state) => state.logout);
 
   return {
     user,
@@ -22,8 +21,10 @@ export function useAuth() {
     updateUser,
     connectGitHub,
     disconnectGitHub: () => {
-      // First, clean up the GitHub store state
-      githubLogout();
+      // First, clean up the GitHub store state completely
+      // Use direct access to the store to ensure we're calling the most up-to-date method
+      const githubStore = useGitHubStore.getState();
+      githubStore.logout();
       
       // Remove GitHub token from localStorage
       localStorage.removeItem('github_token');
@@ -33,8 +34,29 @@ export function useAuth() {
         // Create a new user object without the githubUser property
         const updatedUser = { ...user };
         delete updatedUser.githubUser;
+        
+        // Update isAuthenticated to false since GitHub is disconnected
+        // This matches the field name in the AuthState interface
         updatedUser.isAuthenticated = false;
+        
+        // Update the store with the new user profile
         updateUser(updatedUser);
+        
+        // Force a UI update by re-fetching user data after a delay
+        setTimeout(() => {
+          const authStore = useAuthStore.getState();
+          // Double check that the githubUser was removed
+          const currentUser = authStore.user;
+          if (currentUser && currentUser.githubUser) {
+            const cleanUser = { ...currentUser };
+            delete cleanUser.githubUser;
+            cleanUser.isAuthenticated = false;
+            authStore.updateUser(cleanUser);
+          }
+          
+          // Force GitHub store to clear again to be extra safe
+          useGitHubStore.getState().logout();
+        }, 100);
       }
     },
     updateUserWithGitHub: (token: string) => {
@@ -44,6 +66,15 @@ export function useAuth() {
         throw new Error("No wallet connected");
       }
       return updateUserWithGitHub(token, address);
+    },
+    // Provide access to GitHub data from the store
+    github: {
+      user: useGitHubStore((state) => state.user),
+      repositories: useGitHubStore((state) => state.repositories),
+      statistics: useGitHubStore((state) => state.statistics),
+      isAuthenticated: useGitHubStore((state) => state.isAuthenticated),
+      fetchRepositories: () => useGitHubStore.getState().fetchUserRepositories(),
+      fetchStatistics: () => useGitHubStore.getState().fetchUserStatistics()
     }
   };
 } 

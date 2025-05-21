@@ -5,7 +5,7 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 
 interface FeaturedNFTsProps {
-  walletAddress?: string;
+  walletAddress?: string | null;
 }
 
 export default function FeaturedNFTs({ walletAddress }: FeaturedNFTsProps) {

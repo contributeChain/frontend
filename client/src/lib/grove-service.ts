@@ -148,6 +148,7 @@ export async function fetchUsers(): Promise<User[]> {
 export async function fetchTrendingDevelopers(limit: number = 5): Promise<User[]> {
   try {
     const users = await fetchUsers();
+    console.log('Users:', users);
     return users
       .sort((a, b) => (b.reputation || 0) - (a.reputation || 0))
       .slice(0, limit);

@@ -1,70 +1,95 @@
-import { ReactNode, createContext, useContext, useState, useEffect } from 'react';
-import { networkConfig, lensClient, authenticateWithLens, checkLensProfile } from '@/lib/lensClient';
+import { ReactNode, createContext, useState, useEffect, useRef, useCallback, useContext } from 'react';
 import { useAccount, useWalletClient } from 'wagmi';
 import { useToast } from '@/hooks/use-toast';
+import { checkLensProfile, authenticateWithLens, lensClient } from '@/lib/lensClient';
+import { useLensStore } from '@/store';
 
-interface LensContextType {
-  hasProfile: boolean | null;
+// Define the LensSession type locally since it's not exported
+type LensSession = {
+  accessToken: string;
+  refreshToken: string;
+  tokenExpiry: number;
+};
+
+export type LensContextType = {
   isAuthenticated: boolean;
-  isLoading: boolean;
   authenticate: () => Promise<boolean>;
   logout: () => Promise<void>;
-}
+  hasProfile: boolean | null;
+  isLoading: boolean;
+  sessionClient: any | null;
+};
 
-const LensContext = createContext<LensContextType>({
-  hasProfile: null,
+export const LensContext = createContext<LensContextType>({
   isAuthenticated: false,
-  isLoading: true,
   authenticate: async () => false,
   logout: async () => {},
+  hasProfile: null,
+  isLoading: false,
+  sessionClient: null,
 });
 
+// Hook to use the Lens context
 export const useLens = () => useContext(LensContext);
 
-interface LensProviderProps {
-  children: ReactNode;
-}
-
-export function LensProvider({ children }: LensProviderProps) {
-  const [hasProfile, setHasProfile] = useState<boolean | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const { address, isConnected } = useAccount();
+export default function LensProvider({ children }: { children: ReactNode }) {
+  // Get state and methods from Zustand store
+  const {
+    hasProfile: storeHasProfile,
+    isAuthenticated: storeIsAuthenticated,
+    isLoading: storeIsLoading,
+    authenticate: storeAuthenticate,
+    logout: storeLogout,
+    checkAuth: storeCheckAuth
+  } = useLensStore();
+  
+  // Local state to track sessionClient which isn't tracked in the store
+  const [sessionClient, setSessionClient] = useState<any>(null);
+  
+  // Access account and wallet client for authentication
+  const { address } = useAccount();
   const { data: walletClient } = useWalletClient();
   const { toast } = useToast();
-
-  // Check authentication status on mount and when wallet changes
+  
+  // For tracking component mount status
+  const isMountedRef = useRef(true);
+  
+  // Update session client when authenticated state changes
   useEffect(() => {
-    const checkAuth = async () => {
-      if (!address) {
-        setIsAuthenticated(false);
-        setHasProfile(null);
-        setIsLoading(false);
-        return;
-      }
-
-      setIsLoading(true);
-      
-      try {
-        // Check if the user is already authenticated
-        const resumed = await lensClient.resumeSession();
-        setIsAuthenticated(resumed.isOk());
-        
-        // Check if the user has a Lens profile
-        const profileResult = await checkLensProfile(address);
-        setHasProfile(profileResult.hasProfile);
-      } catch (error) {
-        console.error("Error checking Lens authentication:", error);
-        setIsAuthenticated(false);
-      } finally {
-        setIsLoading(false);
+    const updateSessionClient = async () => {
+      if (storeIsAuthenticated) {
+        try {
+          const resumed = await lensClient.resumeSession();
+          if (resumed.isOk()) {
+            setSessionClient(resumed.value);
+          }
+        } catch (err) {
+          // Silent fail is acceptable here
+        }
+      } else {
+        setSessionClient(null);
       }
     };
     
-    checkAuth();
-  }, [address, isConnected]);
+    updateSessionClient();
+  }, [storeIsAuthenticated]);
+  
+  // Sync with store when address changes
+  useEffect(() => {
+    if (address) {
+      storeCheckAuth(address);
+    }
+  }, [address, storeCheckAuth]);
+  
+  // Track component mounting status
+  useEffect(() => {
+    isMountedRef.current = true;
+    
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
-  // Authenticate with Lens Protocol
   const authenticate = async (): Promise<boolean> => {
     if (!address || !walletClient) {
       toast({
@@ -75,81 +100,57 @@ export function LensProvider({ children }: LensProviderProps) {
       return false;
     }
     
-    setIsLoading(true);
+    const success = await storeAuthenticate(address, walletClient);
     
-    try {
-      const authResult = await authenticateWithLens(address, walletClient);
-      
-      if (authResult.success) {
-        setIsAuthenticated(true);
-        
-        toast({
-          title: "Authentication Successful",
-          description: "You're now connected to Lens Protocol",
-          variant: "default"
-        });
-        
-        return true;
-      } else {
-        toast({
-          title: "Authentication Failed",
-          description: "Failed to authenticate with Lens Protocol",
-          variant: "destructive"
-        });
-        
-        return false;
+    if (success) {
+      // Try to get the session client
+      try {
+        const resumed = await lensClient.resumeSession();
+        if (resumed.isOk()) {
+          setSessionClient(resumed.value);
+          
+          toast({
+            title: "Authentication Successful",
+            description: "You're now connected to Lens Protocol",
+            variant: "default"
+          });
+        }
+      } catch (err) {
+        // Silent fail
       }
-    } catch (error) {
-      console.error("Error authenticating with Lens:", error);
-      
+    } else {
       toast({
-        title: "Authentication Error",
-        description: "An error occurred while connecting to Lens Protocol",
+        title: "Authentication Failed",
+        description: "Failed to authenticate with Lens Protocol",
         variant: "destructive"
       });
-      
-      return false;
-    } finally {
-      setIsLoading(false);
     }
+    
+    return success;
   };
 
-  // Logout from Lens Protocol
   const logout = async (): Promise<void> => {
-    try {
-      // Clear the session from storage
-      localStorage.removeItem('lens.session.key');
-      sessionStorage.removeItem('lens.session.key');
-      
-      // Update state
-      setIsAuthenticated(false);
-      
-      toast({
-        title: "Logged Out",
-        description: "You've been disconnected from Lens Protocol",
-        variant: "default"
-      });
-    } catch (error) {
-      console.error("Error logging out from Lens:", error);
-      
-      toast({
-        title: "Logout Error",
-        description: "An error occurred while disconnecting from Lens Protocol",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const value = {
-    hasProfile,
-    isAuthenticated,
-    isLoading,
-    authenticate,
-    logout
+    await storeLogout();
+    setSessionClient(null);
+    
+    toast({
+      title: "Logged Out",
+      description: "You've been disconnected from Lens Protocol",
+      variant: "default"
+    });
   };
 
   return (
-    <LensContext.Provider value={value}>
+    <LensContext.Provider
+      value={{
+        isAuthenticated: storeIsAuthenticated,
+        authenticate,
+        logout,
+        hasProfile: storeHasProfile,
+        isLoading: storeIsLoading,
+        sessionClient,
+      }}
+    >
       {children}
     </LensContext.Provider>
   );

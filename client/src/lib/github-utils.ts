@@ -11,6 +11,12 @@ export interface GitHubUser {
   public_repos: number;
   followers: number;
   following: number;
+  email?: string | null;
+  company?: string | null;
+  hireable?: boolean | null;
+  twitter_username?: string | null;
+  created_at?: string;
+  updated_at?: string;
 }
 
 // Interface for GitHub repository data
@@ -24,6 +30,14 @@ export interface GitHubRepo {
   stargazers_count: number;
   forks_count: number;
   updated_at: string;
+  topics?: string[];
+  owner?: {
+    login: string;
+    avatar_url: string;
+  };
+  visibility?: string;
+  open_issues_count?: number;
+  watchers_count?: number;
 }
 
 // Interface for GitHub contribution data
@@ -41,9 +55,49 @@ export interface GitHubActivity {
   };
   created_at: string;
   payload: any;
+  actor?: {
+    login: string;
+    avatar_url: string;
+  };
 }
 
-import { octokit, getUserProfile, getUserRepositories } from './githubClient';
+// Enhanced interface for a single commit
+export interface GitHubCommit {
+  sha: string;
+  commit: {
+    message: string;
+    author: {
+      name: string;
+      email: string;
+      date: string;
+    }
+  };
+  html_url: string;
+  repository?: string;
+}
+
+// Interface for GitHub event payload that includes commits
+interface PushEventPayload {
+  commits?: Array<{
+    sha: string;
+    message: string;
+    author: {
+      name: string;
+      email: string;
+    }
+  }>;
+  [key: string]: any;
+}
+
+import { Octokit } from '@octokit/core';
+import { getUserProfile, getUserRepositories } from './githubClient';
+
+// Create Octokit instance
+function createOctokit(token?: string): Octokit {
+  return new Octokit({
+    auth: token
+  });
+}
 
 // Fetch GitHub user profile data
 export async function fetchGitHubUser(username: string): Promise<GitHubUser | null> {
@@ -60,7 +114,12 @@ export async function fetchGitHubUser(username: string): Promise<GitHubUser | nu
       blog: user.blog || '',
       public_repos: user.public_repos,
       followers: user.followers,
-      following: user.following
+      following: user.following,
+      email: user.email,
+      company: user.company,
+      twitter_username: user.twitter_username,
+      created_at: user.created_at,
+      updated_at: user.updated_at
     };
   } catch (error) {
     console.error('Error fetching GitHub user:', error);
@@ -81,78 +140,15 @@ export async function fetchGitHubRepos(username: string): Promise<GitHubRepo[]> 
       language: repo.language || '',
       stargazers_count: repo.stargazers_count || 0,
       forks_count: repo.forks_count || 0,
-      updated_at: repo.updated_at || new Date().toISOString()
+      updated_at: repo.updated_at || new Date().toISOString(),
+      topics: repo.topics || [],
+      owner: repo.owner,
+      visibility: repo.visibility,
+      watchers_count: repo.watchers_count
     }));
   } catch (error) {
     console.error('Error fetching GitHub repositories:', error);
     return [];
-  }
-}
-
-// Fetch GitHub user contribution data
-export async function fetchGitHubContributions(username: string): Promise<GitHubContribution[]> {
-  try {
-    // GitHub doesn't have a direct API for contribution calendar data
-    // This would require fetching commit data for each repository and aggregating it
-    // For now, return an empty array or implement a more complex solution
-    console.warn('Using real GitHub API for contributions requires custom implementation');
-    return [];
-  } catch (error) {
-    console.error('Error fetching GitHub contributions:', error);
-    return [];
-  }
-}
-
-// Fetch GitHub user activities
-export async function fetchGitHubActivities(username: string): Promise<GitHubActivity[]> {
-  try {
-    const { data: events } = await octokit.request('GET /users/{username}/events', {
-      username,
-      per_page: 30
-    });
-    
-    return events.map(event => ({
-      id: event.id,
-      type: event.type || 'UnknownEvent',
-      repo: {
-        name: event.repo?.name || 'unknown'
-      },
-      created_at: event.created_at || new Date().toISOString(),
-      payload: event.payload || {}
-    }));
-  } catch (error) {
-    console.error('Error fetching GitHub activities:', error);
-    return [];
-  }
-}
-
-// Connect GitHub account
-export async function connectGitHub(): Promise<{ success: boolean; username?: string }> {
-  // This function would trigger the OAuth flow
-  // The actual implementation would be handled by the OAuth provider
-  console.warn('GitHub OAuth flow should be triggered externally');
-  return { success: false };
-}
-
-// Check if already connected to GitHub
-export async function isGitHubConnected(): Promise<boolean> {
-  try {
-    // This would be handled by the auth state in your application
-    return false;
-  } catch (error) {
-    console.error('Error checking GitHub connection status:', error);
-    return false;
-  }
-}
-
-// Get connected GitHub username
-export async function getConnectedGitHubUsername(): Promise<string | null> {
-  try {
-    // This would be handled by the auth state in your application
-    return null;
-  } catch (error) {
-    console.error('Error getting connected GitHub username:', error);
-    return null;
   }
 }
 

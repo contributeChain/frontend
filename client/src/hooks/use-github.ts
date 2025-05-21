@@ -4,14 +4,14 @@ import { useGitHubStore } from '@/store';
 export function useGitHub() {
   const isAuthenticated = useGitHubStore((state) => state.isAuthenticated);
   const user = useGitHubStore((state) => state.user);
-  const authenticatedClient = useGitHubStore((state) => state.authenticatedClient);
+  const octokit = useGitHubStore((state) => state.octokit);
   const login = useGitHubStore((state) => state.login);
   const logout = useGitHubStore((state) => state.logout);
 
   return {
     isAuthenticated,
     user,
-    authenticatedClient,
+    authenticatedClient: octokit, // For backward compatibility
     login,
     logout
   };

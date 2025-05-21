@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
@@ -8,6 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAccount, useWalletClient } from 'wagmi';
 import { useLens } from '@/hooks/use-lens';
 import { useAuth } from '@/hooks/use-auth';
+import { createLensProfile, checkLensProfile } from '@/lib/lensClient';
 import { 
   Dialog,
   DialogContent,
@@ -31,8 +32,16 @@ export default function LensPostForm() {
   const { toast } = useToast();
   const { address, isConnected } = useAccount();
   const { data: walletClient } = useWalletClient();
-  const { hasProfile, isAuthenticated, authenticate, isLoading } = useLens();
+  const { hasProfile, isAuthenticated, authenticate, isLoading, sessionClient } = useLens();
   const { user } = useAuth();
+  
+  // Local loading state that defaults to true and gets updated once we know the real state
+  const [localLoading, setLocalLoading] = useState(true);
+  
+  // Update local loading state when isLoading changes
+  useEffect(() => {
+    setLocalLoading(isLoading);
+  }, [isLoading]);
 
   // Set GitHub username as default when available
   useEffect(() => {
@@ -47,6 +56,16 @@ export default function LensPostForm() {
       setShowCreateProfileDialog(true);
     }
   }, [hasProfile, isConnected, isLoading, viewAsGuest]);
+
+  // Ensure we're not stuck in loading state forever
+  useEffect(() => {
+    // Set a timeout to force loading to false if it doesn't happen naturally
+    const timeout = setTimeout(() => {
+      setLocalLoading(false);
+    }, 3000); // 3 second timeout
+    
+    return () => clearTimeout(timeout);
+  }, []);
 
   const handleCreateProfile = async () => {
     if (!username.trim() || !address || !walletClient) {
@@ -64,26 +83,46 @@ export default function LensPostForm() {
       // First authenticate with Lens if not already authenticated
       if (!isAuthenticated) {
         const authResult = await authenticate();
+        
         if (!authResult) {
           throw new Error("Failed to authenticate with Lens");
         }
       }
       
-      // TODO: Implement actual username creation with Lens SDK
-      // For now, we'll simulate success and close the dialog
+      // Check if we have an authenticated session
+      if (!sessionClient) {
+        throw new Error("No authenticated session. Please try again.");
+      }
       
-      toast({
-        title: 'Profile Created',
-        description: 'Your Lens profile has been created successfully!',
-        variant: 'default'
-      });
+      // Create a Lens profile with the username
+      const profileResult = await createLensProfile(username, sessionClient);
       
-      setShowCreateProfileDialog(false);
+      if (profileResult.success) {
+        toast({
+          title: 'Profile Created',
+          description: `Your Lens profile ${username} has been created successfully!`,
+          variant: 'default'
+        });
+        
+        // Refresh hasProfile state - re-fetch the profile status
+        if (address) {
+          const profileCheck = await checkLensProfile(address);
+          
+          if (profileCheck.success) {
+            // Update UI states
+            setShowCreateProfileDialog(false);
+            // Force page reload to update all components with new profile state
+            window.location.reload();
+          }
+        }
+      } else {
+        throw new Error(profileResult.error?.message || "Failed to create profile");
+      }
     } catch (error) {
       console.error('Error creating profile:', error);
       toast({
         title: 'Error',
-        description: 'Failed to create your Lens profile',
+        description: error instanceof Error ? error.message : 'Failed to create your Lens profile',
         variant: 'destructive'
       });
     } finally {
@@ -120,6 +159,7 @@ export default function LensPostForm() {
     // Make sure we're authenticated
     if (!isAuthenticated) {
       const authResult = await authenticate();
+      
       if (!authResult) {
         toast({
           title: 'Authentication Failed',
@@ -178,11 +218,12 @@ export default function LensPostForm() {
   };
   
   // Show loading state when checking profile status
-  if (isLoading) {
+  if (localLoading) {
     return (
       <Card className="w-full max-w-2xl mx-auto">
         <CardContent className="flex justify-center items-center h-32">
           <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+          <div className="ml-4">Loading profile data...</div>
         </CardContent>
       </Card>
     );

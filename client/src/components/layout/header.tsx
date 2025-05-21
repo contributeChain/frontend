@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useAccount } from "wagmi";
 import { useAuthStore, useGitHubStore } from "@/store";
 import { useAuth } from "@/hooks/use-auth";
+import { useGitHub } from "@/hooks/use-github";
 import {
   Sheet,
   SheetContent,
@@ -31,20 +32,21 @@ export default function Header() {
   const [isScrolled, setIsScrolled] = useState(false);
   const { isConnected } = useAccount();
   
-  // Use Zustand stores instead of context
+  // Auth state
   const user = useAuthStore((state) => state.user);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const logout = useAuthStore((state) => state.logout);
-  const githubLogout = useGitHubStore((state) => state.logout);
-  const { disconnectGitHub } = useAuth();
+  
+  // GitHub state
+  const { logout: githubLogout } = useGitHub();
+  const githubUser = useGitHubStore((state) => state.user);
+  const isGitHubAuthenticated = useGitHubStore((state) => state.isAuthenticated);
   
   // Combined logout function
   const handleLogout = () => {
     // First logout from GitHub to clear that state
     githubLogout();
-    // Then disconnect GitHub from auth state
-    disconnectGitHub();
-    // Finally logout from auth
+    // Then logout from auth
     logout();
     // Redirect to home page
     setLocation("/");
@@ -52,7 +54,7 @@ export default function Header() {
   
   // Function to navigate to GitHub link page
   const navigateToGitHubLink = () => {
-    setLocation("/github/link");
+    setLocation("/link-github");
   };
 
   // Navigation items - simplified to the most important ones
@@ -111,6 +113,12 @@ export default function Header() {
   const toggleTheme = () => {
     setTheme(resolvedTheme === "dark" ? "light" : "dark");
   };
+
+  // Determine if we should show GitHub connect option
+  const shouldShowGitHubConnect = isConnected && !user?.githubUser && !isGitHubAuthenticated;
+
+  // Get display user - from GitHub if available
+  const displayUser = user?.githubUser || githubUser;
 
   return (
     <header 
@@ -188,7 +196,7 @@ export default function Header() {
                 <DropdownMenuItem asChild>
                   <Link href="/social">Social</Link>
                 </DropdownMenuItem>
-                {isConnected && !isAuthenticated && (
+                {shouldShowGitHubConnect && (
                   <DropdownMenuItem onClick={navigateToGitHubLink}>
                     <Github size={14} className="mr-2" />
                     Connect GitHub
@@ -213,13 +221,13 @@ export default function Header() {
             </Button>
 
             {/* User profile - compact */}
-            {isAuthenticated && user?.githubUser ? (
+            {isAuthenticated && displayUser ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="h-8 rounded-full p-0 overflow-hidden">
                     <img 
-                      src={user.githubUser.avatar_url} 
-                      alt={user.githubUser.login} 
+                      src={displayUser.avatar_url} 
+                      alt={displayUser.login} 
                       className="w-7 h-7 rounded-full ring-1 ring-primary/30" 
                     />
                   </Button>
@@ -227,15 +235,17 @@ export default function Header() {
                 <DropdownMenuContent align="end" className="w-48">
                   <div className="flex items-center gap-2 p-2 mb-1">
                     <img 
-                      src={user.githubUser.avatar_url} 
-                      alt={user.githubUser.login} 
+                      src={displayUser.avatar_url} 
+                      alt={displayUser.login} 
                       className="w-8 h-8 rounded-full" 
                     />
                     <div className="flex flex-col">
-                      <span className="text-sm font-medium">{user.githubUser.login}</span>
-                      <span className="text-xs text-muted-foreground truncate">
-                        {user.walletAddress.substring(0, 6)}...{user.walletAddress.substring(user.walletAddress.length - 4)}
-                      </span>
+                      <span className="text-sm font-medium">{displayUser.login}</span>
+                      {user?.walletAddress && (
+                        <span className="text-xs text-muted-foreground truncate">
+                          {user.walletAddress.substring(0, 6)}...{user.walletAddress.substring(user.walletAddress.length - 4)}
+                        </span>
+                      )}
                     </div>
                   </div>
                   <DropdownMenuSeparator />
@@ -306,7 +316,7 @@ export default function Header() {
                   </nav>
 
                   <div className="mt-auto pt-4 border-t space-y-2">
-                    {isConnected && !isAuthenticated && (
+                    {shouldShowGitHubConnect && (
                       <SheetClose asChild>
                         <Button 
                           variant="outline"

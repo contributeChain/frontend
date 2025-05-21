@@ -136,7 +136,7 @@ export async function mintNFT(metadata: any): Promise<{ success: boolean; transa
 }
 
 // Mock function to fetch NFTs for a wallet
-export async function fetchNFTsForWallet(walletAddress: string): Promise<NFT[]> {
+export async function fetchNFTsForWallet(walletAddress: string | null): Promise<NFT[]> {
   try {
     // Import dynamically to avoid circular dependencies
     const { fetchNFTs, getNFTsByUserId, getUserByWalletAddress } = await import('./grove-service');

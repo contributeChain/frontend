@@ -7,10 +7,11 @@ import ContributionGrid from "@/components/contribution-grid";
 import UserStats from "@/components/profile/user-stats";
 import FeaturedNFTs from "@/components/profile/featured-nfts";
 import RecentActivity from "@/components/profile/recent-activity";
-import { fetchGitHubUser } from "@/lib/github-utils";
+import { getUserProfile } from "@/lib/githubClient";
 import { getCurrentWalletAddress, shortenAddress } from "@/lib/web3-utils";
 import { getUserByGitHubUsername, getRepositoriesByUserId, addUserToCollection, Repository, User } from "@/lib/grove-service";
 import { useAuth } from "@/hooks/use-auth";
+import WalletConnectButton from "@/components/wallet-connect-button";
 
 interface ProfileProps {
   username?: string | null;
@@ -27,7 +28,6 @@ export default function Profile({ username }: ProfileProps) {
   const [, navigate] = useLocation();
   const { user: authUser, isAuthenticated } = useAuth();
   const [notFound, setNotFound] = useState(false);
-
   useEffect(() => {
     const loadProfileData = async () => {
       setIsLoading(true);
@@ -38,136 +38,12 @@ export default function Profile({ username }: ProfileProps) {
         const address = await getCurrentWalletAddress();
         setWalletAddress(address);
         
-        // CASE 1: Viewing a specific user's profile by username
         if (username) {
-          console.log(`Loading profile for GitHub username: ${username}`);
-          const userData = await getUserByGitHubUsername(username);
-          
-          if (userData) {
-            // User found in Grove
-            setUser(userData);
-            
-            // Fetch repositories
-            if (userData.id) {
-              const reposData = await getRepositoriesByUserId(userData.id);
-              setRepositories(reposData);
-            }
-          } else {
-            // User not found in Grove, try to fetch from GitHub directly
-            console.log(`User not found in Grove, fetching from GitHub: ${username}`);
-            const githubUser = await fetchGitHubUser(username);
-            
-            if (githubUser) {
-              // Create a placeholder user from GitHub data
-              const placeholderUser: User = {
-                id: Date.now(),
-                username: githubUser.name || githubUser.login,
-                githubUsername: githubUser.login,
-                avatarUrl: githubUser.avatar_url,
-                reputation: Math.floor(Math.random() * 1000),
-                password: "",
-                walletAddress: null,
-                bio: githubUser.bio || null,
-                location: githubUser.location || null,
-                website: githubUser.blog || githubUser.html_url || null,
-                createdAt: new Date()
-              };
-              
-              setUser(placeholderUser);
-              
-              // If we're authenticated, we could save this user to Grove
-              if (isAuthenticated && address && address.startsWith('0x')) {
-                console.log('Saving GitHub user to Grove collection');
-                await addUserToCollection(placeholderUser, address as `0x${string}`);
-              }
-            } else {
-              // User not found on GitHub either
-              console.log(`User not found: ${username}`);
-              setNotFound(true);
-              toast({
-                title: "User not found",
-                description: `Could not find a user with username ${username}`,
-                variant: "destructive"
-              });
-            }
-          }
-        } 
-        // CASE 2: Viewing the current authenticated user's profile
-        else if (isAuthenticated && authUser) {
-          console.log('Loading authenticated user profile');
-          
-          // If the user has a GitHub account linked
-          if (authUser.githubUser) {
-            const githubUsername = authUser.githubUser.login;
-            console.log(`Authenticated user has GitHub: ${githubUsername}`);
-            
-            // Try to get user from Grove by GitHub username
-            let userData = await getUserByGitHubUsername(githubUsername);
-            
-            if (userData) {
-              // User found in Grove
-              setUser(userData);
-              
-              // Fetch repositories
-              if (userData.id) {
-                const reposData = await getRepositoriesByUserId(userData.id);
-                setRepositories(reposData);
-              }
-            } else {
-              // User not in Grove yet, create from authUser
-              console.log('Creating user profile from authenticated GitHub user');
-              const newUser: User = {
-                id: Date.now(),
-                username: authUser.githubUser.name || authUser.githubUser.login,
-                githubUsername: authUser.githubUser.login,
-                avatarUrl: authUser.githubUser.avatar_url,
-                reputation: 0,
-                password: "",
-                walletAddress: authUser.walletAddress,
-                bio: authUser.githubUser.bio || null,
-                location: (authUser.githubUser as any).location || null,
-                website: (authUser.githubUser as any).blog || authUser.githubUser.html_url || null,
-                createdAt: new Date()
-              };
-              
-              setUser(newUser);
-              
-              // Save to Grove if we have a valid wallet address
-              if (authUser.walletAddress && authUser.walletAddress.startsWith('0x')) {
-                console.log('Saving authenticated user to Grove collection');
-                await addUserToCollection(newUser, authUser.walletAddress as `0x${string}`);
-              }
-            }
-          } else {
-            // Authenticated but no GitHub account linked
-            console.log('Authenticated user has no GitHub account linked');
-            toast({
-              title: "GitHub account not linked",
-              description: "Please link your GitHub account to view your profile",
-            });
-            
-            // Create minimal user profile from wallet
-            const minimalUser: User = {
-              id: Date.now(),
-              username: `user_${Date.now()}`,
-              githubUsername: null,
-              avatarUrl: null,
-              reputation: 0,
-              password: "",
-              walletAddress: authUser.walletAddress,
-              bio: null,
-              location: null,
-              website: null,
-              createdAt: new Date()
-            };
-            
-            setUser(minimalUser);
-          }
-        } 
-        // CASE 3: Not authenticated and no username provided
-        else {
-          console.log('Not authenticated and no username provided');
-          // Don't redirect, just set user to null and show connect profile component
+          await loadUserByGitHubUsername(username);
+        } else if (isAuthenticated && authUser) {
+          await loadAuthenticatedUserProfile();
+        } else {
+          // Not authenticated and no username provided
           setUser(null);
         }
       } catch (error) {
@@ -184,6 +60,137 @@ export default function Profile({ username }: ProfileProps) {
     
     loadProfileData();
   }, [username, toast, navigate, authUser, isAuthenticated]);
+
+  // Load a user by GitHub username (viewing another user's profile)
+  const loadUserByGitHubUsername = async (githubUsername: string) => {
+    console.log(`Loading profile for GitHub username: ${githubUsername}`);
+    
+    // Try to get user from Grove by GitHub username
+    const userData = await getUserByGitHubUsername(githubUsername);
+    
+    if (userData) {
+      // User found in Grove
+      setUser(userData);
+      
+      // Fetch repositories
+      if (userData.id) {
+        const reposData = await getRepositoriesByUserId(userData.id);
+        setRepositories(reposData);
+      }
+    } else {
+      // User not found in Grove, try to fetch from GitHub directly
+      console.log(`User not found in Grove, fetching from GitHub: ${githubUsername}`);
+      const githubUser = await getUserProfile(githubUsername);
+      
+      if (githubUser) {
+        // Create a placeholder user from GitHub data
+        const placeholderUser: User = {
+          id: Date.now(),
+          username: githubUser.name || githubUser.login,
+          githubUsername: githubUser.login,
+          avatarUrl: githubUser.avatar_url,
+          reputation: Math.floor(Math.random() * 1000),
+          password: "",
+          walletAddress: null,
+          bio: githubUser.bio || null,
+          location: githubUser.location || null,
+          website: githubUser.blog || githubUser.html_url || null,
+          createdAt: new Date()
+        };
+        
+        setUser(placeholderUser);
+        
+        // If we're authenticated, we could save this user to Grove
+        const address = await getCurrentWalletAddress();
+        if (isAuthenticated && address && address.startsWith('0x')) {
+          console.log('Saving GitHub user to Grove collection');
+          await addUserToCollection(placeholderUser, address as `0x${string}`);
+        }
+      } else {
+        // User not found on GitHub either
+        console.log(`User not found: ${githubUsername}`);
+        setNotFound(true);
+        toast({
+          title: "User not found",
+          description: `Could not find a user with username ${githubUsername}`,
+          variant: "destructive"
+        });
+      }
+    }
+  };
+
+  // Load the authenticated user's profile
+  const loadAuthenticatedUserProfile = async () => {
+    console.log('Loading authenticated user profile');
+    
+    // If the user has a GitHub account linked
+    if (authUser?.githubUser) {
+      const githubUsername = authUser.githubUser.login;
+      console.log(`Authenticated user has GitHub: ${githubUsername}`);
+      
+      // Try to get user from Grove by GitHub username
+      let userData = await getUserByGitHubUsername(githubUsername);
+      
+      if (userData) {
+        // User found in Grove
+        setUser(userData);
+        
+        // Fetch repositories
+        if (userData.id) {
+          const reposData = await getRepositoriesByUserId(userData.id);
+          setRepositories(reposData);
+        }
+      } else {
+        // User not in Grove yet, create from authUser
+        console.log('Creating user profile from authenticated GitHub user');
+        const newUser: User = {
+          id: Date.now(),
+          username: authUser.githubUser.name || authUser.githubUser.login,
+          githubUsername: authUser.githubUser.login,
+          avatarUrl: authUser.githubUser.avatar_url,
+          reputation: 0,
+          password: "",
+          walletAddress: authUser.walletAddress,
+          bio: authUser.githubUser.bio || null,
+          location: (authUser.githubUser as any).location || null,
+          website: (authUser.githubUser as any).blog || authUser.githubUser.html_url || null,
+          createdAt: new Date()
+        };
+        
+        setUser(newUser);
+        
+        // Save to Grove if we have a valid wallet address
+        if (authUser.walletAddress && authUser.walletAddress.startsWith('0x')) {
+          console.log('Saving authenticated user to Grove collection');
+          await addUserToCollection(newUser, authUser.walletAddress as `0x${string}`);
+        }
+      }
+    } else {
+      // Authenticated but no GitHub account linked
+      console.log('Authenticated user has no GitHub account linked');
+      toast({
+        title: "GitHub account not linked",
+        description: "Please link your GitHub account to view your profile",
+      });
+      
+      // Create minimal user profile from wallet
+      const minimalUser: User = {
+        id: Date.now(),
+        username: `user_${Date.now()}`,
+        githubUsername: null,
+        avatarUrl: null,
+        reputation: 0,
+        password: "",
+        walletAddress: authUser?.walletAddress || null,
+        bio: null,
+        location: null,
+        website: null,
+        createdAt: new Date()
+      };
+      
+      setUser(minimalUser);
+    }
+  };
 
   const handleFollow = () => {
     setIsFollowing(!isFollowing);
@@ -246,9 +253,7 @@ export default function Profile({ username }: ProfileProps) {
             <Button onClick={() => navigate('/link-github')} variant="outline">
               <i className="fab fa-github mr-2"></i> Link GitHub
             </Button>
-            <Button onClick={() => navigate('/')}>
-              <i className="fas fa-wallet mr-2"></i> Connect Wallet
-            </Button>
+            <WalletConnectButton />
           </div>
         </div>
       </div>
@@ -340,7 +345,7 @@ export default function Profile({ username }: ProfileProps) {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 p-6">
               {/* NFTs Column */}
               <div className="lg:col-span-1">
-                <FeaturedNFTs walletAddress={user.walletAddress || undefined} />
+                <FeaturedNFTs walletAddress={user.walletAddress} />
               </div>
               
               {/* Contribution Graph Column */}

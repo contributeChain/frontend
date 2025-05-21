@@ -14,7 +14,7 @@ export default function TrendingDevelopers() {
       
       try {
         // Get trending developers from Grove storage
-        const trendingDevs = await fetchTrendingDevelopers(5);
+        const trendingDevs = await fetchTrendingDevelopers(10);
         setDevelopers(trendingDevs);
       } catch (error) {
         console.error("Error fetching trending developers from Grove:", error);

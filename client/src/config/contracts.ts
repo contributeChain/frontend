@@ -22,7 +22,7 @@ const LENS_MAINNET_ADDRESSES: ContractAddresses = {
 
 // Default to testnet for development, can be overridden via environment variable
 export const DEFAULT_NETWORK: NetworkEnvironment = 
-  (import.meta.env.VITE_NETWORK_ENV as NetworkEnvironment) || 'testnet';
+  (import.meta.env?.VITE_NETWORK_ENV as NetworkEnvironment) || 'testnet';
 
 /**
  * Get contract addresses based on Lens network environment
