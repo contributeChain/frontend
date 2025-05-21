@@ -334,31 +334,44 @@ export async function mintContributionNft(
 
     // Get contract address from config
     const contractAddress = getNftContractAddress() as `0x${string}`;
-
-    // For demo purposes, we're still simulating a transaction here
-    // In a real implementation, this would use the Viem client to call the contract
-    // For example:
-    // const walletClient = createWalletClientFromProvider(provider);
-    // const hash = await walletClient.writeContract({
-    //   address: contractAddress,
-    //   abi: contributorNftAbi,
-    //   functionName: "mintContribution",
-    //   args: [
-    //     recipient,
-    //     repoUrl,
-    //     BigInt(score),
-    //     metadataUri
-    //   ]
-    // });
     
-    // Simulate a blockchain transaction
-    const mockTransactionHash = `0x${Math.random().toString(16).substring(2)}`;
+    if (!provider) {
+      throw new Error("Web3 provider is required for minting NFTs");
+    }
+
+    // Use the provider to create a wallet client
+    const walletClient = createWalletClientFromProvider(provider);
+    
+    // Call the contract to mint the NFT
+    const hash = await walletClient.writeContract({
+      address: contractAddress,
+      abi: contributorNftAbi,
+      functionName: "mintContribution",
+      args: [
+        recipient,
+        repoUrl,
+        BigInt(score),
+        metadataUri
+      ],
+      account: recipient
+    });
+    
+    console.log("NFT minted successfully, transaction hash:", hash);
     
     return {
       success: true,
-      transactionHash: mockTransactionHash
+      transactionHash: hash
     };
   } catch (error: any) {
+    // Handle contract errors more specifically
+    if (error instanceof ContractFunctionExecutionError) {
+      console.error("Contract execution error:", error.cause);
+      return {
+        success: false,
+        error: `Contract error: ${error.cause || error.message}`
+      };
+    }
+    
     console.error("Error minting NFT:", error);
     return {
       success: false,

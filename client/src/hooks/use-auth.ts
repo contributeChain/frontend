@@ -1,4 +1,4 @@
-import { useAuthStore } from '@/store';
+import { useAuthStore, useGitHubStore } from '@/store';
 import type { UserProfile } from '@/lib/auth-service';
 
 // This is a compatibility layer to provide the same API as the old useAuth hook
@@ -11,6 +11,7 @@ export function useAuth() {
   const updateUser = useAuthStore((state) => state.updateUser);
   const connectGitHub = useAuthStore((state) => state.connectGitHub);
   const updateUserWithGitHub = useAuthStore((state) => state.updateUserWithGitHub);
+  const githubLogout = useGitHubStore((state) => state.logout);
 
   return {
     user,
@@ -21,6 +22,13 @@ export function useAuth() {
     updateUser,
     connectGitHub,
     disconnectGitHub: () => {
+      // First, clean up the GitHub store state
+      githubLogout();
+      
+      // Remove GitHub token from localStorage
+      localStorage.removeItem('github_token');
+      
+      // Then update the auth store state
       if (user) {
         // Create a new user object without the githubUser property
         const updatedUser = { ...user };

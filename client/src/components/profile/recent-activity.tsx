@@ -1,10 +1,9 @@
 import { useState, useEffect } from "react";
-import { User } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { formatTimeAgo } from "@/lib/utils";
 import { Link } from "wouter";
 import { getActivitiesByUserId } from "@/lib/grove-service";
-import type { Activity } from "@/lib/grove-service";
+import type { Activity, User } from "@/lib/grove-service";
 
 interface RecentActivityProps {
   user: User;
@@ -108,7 +107,7 @@ export default function RecentActivity({ user }: RecentActivityProps) {
               <div className="flex justify-between items-start">
                 <div className="font-medium">
                   {activityItem.activity.repoName && (
-                    <>Activity in <Link href={`/repositories/${activityItem.activity.repoName}`}><a className="text-primary">{activityItem.activity.repoName}</a></Link></>
+                    <>Activity in <Link href={`/repositories/${activityItem.activity.repoName}`} className="text-primary">{activityItem.activity.repoName}</Link></>
                   )}
                   {!activityItem.activity.repoName && (
                     <>{activityItem.activity.description}</>

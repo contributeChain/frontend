@@ -4,6 +4,7 @@ import { Helmet } from 'react-helmet-async';
 import { useAccount } from 'wagmi';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
+import { useGitHubStore } from '@/store';
 import { Container } from '@/components/layout/container';
 import { GitHubProfileLink } from '@/components/github/GitHubProfileLink';
 import { GitHubProfilePreview } from '@/components/profile/GitHubProfilePreview';
@@ -11,19 +12,28 @@ import { GitHubProfilePreview } from '@/components/profile/GitHubProfilePreview'
 export default function LinkGitHubPage() {
   const { address, isConnected } = useAccount();
   const { user, isAuthenticated } = useAuth();
+  const gitHubAuth = useGitHubStore(state => ({ 
+    isAuthenticated: state.isAuthenticated,
+    user: state.user 
+  }));
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
   
   // If already authenticated with GitHub, redirect to profile
   useEffect(() => {
-    if (isAuthenticated && user?.githubUser) {
+    // Check both auth store and GitHub store authentication state
+    const hasGitHubConnected = 
+      (isAuthenticated && user?.githubUser) || 
+      (gitHubAuth.isAuthenticated && gitHubAuth.user);
+    
+    if (hasGitHubConnected) {
       toast({
         title: "Already Connected",
         description: "Your GitHub account is already linked to your wallet",
       });
       setLocation('/profile');
     }
-  }, [isAuthenticated, user, setLocation, toast]);
+  }, [isAuthenticated, user, gitHubAuth.isAuthenticated, gitHubAuth.user, setLocation, toast]);
   
   const handleComplete = () => {
     setLocation('/profile');
@@ -52,7 +62,7 @@ export default function LinkGitHubPage() {
         )}
         
         <div className="mt-8">
-          {isConnected && user?.githubUser ? (
+          {isConnected && (user?.githubUser || gitHubAuth.user) ? (
             <GitHubProfilePreview onConfirm={handleComplete} />
           ) : (
             <GitHubProfileLink onComplete={handleComplete} />

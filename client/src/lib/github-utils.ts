@@ -43,17 +43,25 @@ export interface GitHubActivity {
   payload: any;
 }
 
+import { octokit, getUserProfile, getUserRepositories } from './githubClient';
+
 // Fetch GitHub user profile data
 export async function fetchGitHubUser(username: string): Promise<GitHubUser | null> {
   try {
-    const response = await fetch(`/api/github/user/${username}`);
-    
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to fetch GitHub user');
-    }
-    
-    return await response.json();
+    const user = await getUserProfile(username);
+    return {
+      login: user.login,
+      id: user.id,
+      avatar_url: user.avatar_url,
+      html_url: user.html_url,
+      name: user.name || user.login,
+      bio: user.bio || '',
+      location: user.location || '',
+      blog: user.blog || '',
+      public_repos: user.public_repos,
+      followers: user.followers,
+      following: user.following
+    };
   } catch (error) {
     console.error('Error fetching GitHub user:', error);
     return null;
@@ -63,14 +71,18 @@ export async function fetchGitHubUser(username: string): Promise<GitHubUser | nu
 // Fetch GitHub user repositories
 export async function fetchGitHubRepos(username: string): Promise<GitHubRepo[]> {
   try {
-    const response = await fetch(`/api/github/repos/${username}`);
-    
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to fetch GitHub repositories');
-    }
-    
-    return await response.json();
+    const repos = await getUserRepositories(username);
+    return repos.map(repo => ({
+      id: repo.id,
+      name: repo.name,
+      full_name: repo.full_name,
+      description: repo.description || '',
+      html_url: repo.html_url,
+      language: repo.language || '',
+      stargazers_count: repo.stargazers_count || 0,
+      forks_count: repo.forks_count || 0,
+      updated_at: repo.updated_at || new Date().toISOString()
+    }));
   } catch (error) {
     console.error('Error fetching GitHub repositories:', error);
     return [];
@@ -80,14 +92,11 @@ export async function fetchGitHubRepos(username: string): Promise<GitHubRepo[]> 
 // Fetch GitHub user contribution data
 export async function fetchGitHubContributions(username: string): Promise<GitHubContribution[]> {
   try {
-    const response = await fetch(`/api/github/contributions/${username}`);
-    
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to fetch GitHub contributions');
-    }
-    
-    return await response.json();
+    // GitHub doesn't have a direct API for contribution calendar data
+    // This would require fetching commit data for each repository and aggregating it
+    // For now, return an empty array or implement a more complex solution
+    console.warn('Using real GitHub API for contributions requires custom implementation');
+    return [];
   } catch (error) {
     console.error('Error fetching GitHub contributions:', error);
     return [];
@@ -97,14 +106,20 @@ export async function fetchGitHubContributions(username: string): Promise<GitHub
 // Fetch GitHub user activities
 export async function fetchGitHubActivities(username: string): Promise<GitHubActivity[]> {
   try {
-    const response = await fetch(`/api/github/activities/${username}`);
+    const { data: events } = await octokit.request('GET /users/{username}/events', {
+      username,
+      per_page: 30
+    });
     
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to fetch GitHub activities');
-    }
-    
-    return await response.json();
+    return events.map(event => ({
+      id: event.id,
+      type: event.type || 'UnknownEvent',
+      repo: {
+        name: event.repo?.name || 'unknown'
+      },
+      created_at: event.created_at || new Date().toISOString(),
+      payload: event.payload || {}
+    }));
   } catch (error) {
     console.error('Error fetching GitHub activities:', error);
     return [];
@@ -113,56 +128,17 @@ export async function fetchGitHubActivities(username: string): Promise<GitHubAct
 
 // Connect GitHub account
 export async function connectGitHub(): Promise<{ success: boolean; username?: string }> {
-  try {
-    // In a real app, this would redirect to GitHub OAuth flow
-    // For demo purposes, we'll simulate a successful connection
-    
-    // Mock GitHub OAuth flow with a prompt for username
-    const username = prompt('Enter your GitHub username:');
-    
-    if (!username) {
-      return { success: false };
-    }
-    
-    // Verify the username exists
-    const user = await fetchGitHubUser(username);
-    
-    if (!user) {
-      throw new Error('GitHub user not found');
-    }
-    
-    // Save to our backend
-    const response = await fetch('/api/github/connect', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ username }),
-    });
-    
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to connect GitHub account');
-    }
-    
-    return { success: true, username };
-  } catch (error) {
-    console.error('Error connecting GitHub account:', error);
-    return { success: false };
-  }
+  // This function would trigger the OAuth flow
+  // The actual implementation would be handled by the OAuth provider
+  console.warn('GitHub OAuth flow should be triggered externally');
+  return { success: false };
 }
 
 // Check if already connected to GitHub
 export async function isGitHubConnected(): Promise<boolean> {
   try {
-    const response = await fetch('/api/github/status');
-    
-    if (!response.ok) {
-      return false;
-    }
-    
-    const data = await response.json();
-    return data.connected;
+    // This would be handled by the auth state in your application
+    return false;
   } catch (error) {
     console.error('Error checking GitHub connection status:', error);
     return false;
@@ -172,14 +148,8 @@ export async function isGitHubConnected(): Promise<boolean> {
 // Get connected GitHub username
 export async function getConnectedGitHubUsername(): Promise<string | null> {
   try {
-    const response = await fetch('/api/github/status');
-    
-    if (!response.ok) {
-      return null;
-    }
-    
-    const data = await response.json();
-    return data.username || null;
+    // This would be handled by the auth state in your application
+    return null;
   } catch (error) {
     console.error('Error getting connected GitHub username:', error);
     return null;

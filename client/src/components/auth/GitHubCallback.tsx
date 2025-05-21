@@ -58,7 +58,7 @@ export function GitHubCallback() {
       try {
         // Exchange code for access token via our server endpoint - only once
         console.log("Exchanging authorization code for token...");
-        const response = await axios.get(`/api/github/oauth/callback?code=${code}`);
+        const response = await axios.post(`/api/auth/callback`, { code });
         
         if (response.status !== 200 || !response.data.access_token) {
           throw new Error('Failed to exchange code for token');

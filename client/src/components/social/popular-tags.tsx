@@ -31,10 +31,12 @@ export default function PopularTags() {
       <div className="p-4">
         <div className="flex flex-wrap gap-2">
           {tags.map((tag, index) => (
-            <Link key={index} href={`/explore?tag=${tag.name}`}>
-              <a className={`px-3 py-1 ${tag.colorClass} rounded-full text-sm hover:opacity-80 transition-opacity`}>
-                {tag.name}
-              </a>
+            <Link 
+              key={index} 
+              href={`/explore?tag=${tag.name}`}
+              className={`px-3 py-1 ${tag.colorClass} rounded-full text-sm hover:opacity-80 transition-opacity cursor-pointer`}
+            >
+              {tag.name}
             </Link>
           ))}
         </div>

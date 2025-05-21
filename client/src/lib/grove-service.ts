@@ -577,4 +577,20 @@ export async function getRepositoryById(id: number): Promise<Repository | null> 
     console.error(`Error getting repository by ID (${id}):`, error);
     return null;
   }
+}
+
+/**
+ * Gets a user by wallet address from the Grove storage
+ * @param walletAddress The wallet address to search for
+ * @returns The user with the specified wallet address, or null if not found
+ */
+export async function getUserByWalletAddress(walletAddress: string): Promise<User | null> {
+  try {
+    const users = await fetchUsers();
+    const user = users.find(user => user.walletAddress?.toLowerCase() === walletAddress.toLowerCase());
+    return user || null;
+  } catch (error) {
+    console.error(`Error getting user by wallet address (${walletAddress}):`, error);
+    return null;
+  }
 } 

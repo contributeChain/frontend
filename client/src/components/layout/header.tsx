@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useAccount } from "wagmi";
 import { useAuthStore, useGitHubStore } from "@/store";
+import { useAuth } from "@/hooks/use-auth";
 import {
   Sheet,
   SheetContent,
@@ -35,11 +36,18 @@ export default function Header() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const logout = useAuthStore((state) => state.logout);
   const githubLogout = useGitHubStore((state) => state.logout);
+  const { disconnectGitHub } = useAuth();
   
   // Combined logout function
   const handleLogout = () => {
-    logout();
+    // First logout from GitHub to clear that state
     githubLogout();
+    // Then disconnect GitHub from auth state
+    disconnectGitHub();
+    // Finally logout from auth
+    logout();
+    // Redirect to home page
+    setLocation("/");
   };
   
   // Function to navigate to GitHub link page

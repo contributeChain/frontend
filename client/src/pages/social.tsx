@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { Helmet } from "react-helmet";
 import { Button } from "@/components/ui/button";
-import { Activity, User } from "@shared/schema";
 import ActivityCard from "@/components/activity-card";
 import TrendingDevelopers from "@/components/social/trending-developers";
 import PopularNFTs from "@/components/social/popular-nfts";
@@ -17,6 +16,7 @@ import {
   AlertTitle,
   AlertDescription 
 } from "@/components/ui/alert";
+import { Activity, User } from "@/lib/grove-service";
 
 export default function Social() {
   const [activities, setActivities] = useState<{activity: Activity, user: User}[]>([]);
@@ -67,16 +67,16 @@ export default function Social() {
 
   const filteredActivities = activities.filter(item => {
     // Cast metadata to our type to help TypeScript
-    const metadata = item.activity.metadata as LensPostMetadata;
+    const metadata = item.activity.activity.metadata as LensPostMetadata;
     
     if (filter === "all") return true;
-    if (filter === "nft_mints" && item.activity.type === "nft_mint") return true;
+    if (filter === "nft_mints" && item.activity.activity.type === "nft_mint") return true;
     if (filter === "achievements" && (
-      item.activity.type === "nft_mint" || 
+      item.activity.activity.type === "nft_mint" || 
       metadata?.achievement
     )) return true;
-    if (filter === "contributions" && item.activity.type === "commit") return true;
-    if (filter === "lens_posts" && item.activity.type === "lens_post") return true;
+    if (filter === "contributions" && item.activity.activity.type === "commit") return true;
+    if (filter === "lens_posts" && item.activity.activity.type === "lens_post") return true;
     return false;
   });
 
@@ -193,7 +193,7 @@ export default function Social() {
                   ) : (
                     <>
                       {filteredActivities.map(({ activity, user }) => (
-                        <ActivityCard key={activity.id} activity={activity} user={user} />
+                        <ActivityCard key={activity.activity.id} activity={activity} user={user} />
                       ))}
                       
                       {isGuestMode && filteredActivities.length > 0 && (

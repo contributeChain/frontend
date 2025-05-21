@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
-import { User, Activity, Repository } from "@shared/schema";
 import { Helmet } from "react-helmet";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -10,7 +9,7 @@ import FeaturedNFTs from "@/components/profile/featured-nfts";
 import RecentActivity from "@/components/profile/recent-activity";
 import { fetchGitHubUser } from "@/lib/github-utils";
 import { getCurrentWalletAddress, shortenAddress } from "@/lib/web3-utils";
-import { getUserByGitHubUsername, getRepositoriesByUserId, addUserToCollection } from "@/lib/grove-service";
+import { getUserByGitHubUsername, getRepositoriesByUserId, addUserToCollection, Repository, User } from "@/lib/grove-service";
 import { useAuth } from "@/hooks/use-auth";
 
 interface ProfileProps {

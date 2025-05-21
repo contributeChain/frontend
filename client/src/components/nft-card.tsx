@@ -26,7 +26,9 @@ export default function NFTCard({ nft, size = "medium", className = "", onClick 
   
   // Get appropriate color class based on rarity
   const getRarityColor = () => {
-    switch (nft.rarity) {
+    const rarityLower = nft.rarity.toLowerCase();
+    
+    switch (rarityLower) {
       case "common":
         return "text-primary";
       case "rare":
@@ -42,7 +44,9 @@ export default function NFTCard({ nft, size = "medium", className = "", onClick 
   
   // Get appropriate icon based on rarity
   const getRarityIcon = () => {
-    switch (nft.rarity) {
+    const rarityLower = nft.rarity.toLowerCase();
+    
+    switch (rarityLower) {
       case "common":
         return "fa-check-circle";
       case "rare":
@@ -58,7 +62,9 @@ export default function NFTCard({ nft, size = "medium", className = "", onClick 
   
   // Get background gradient based on rarity
   const getBackgroundGradient = () => {
-    switch (nft.rarity) {
+    const rarityLower = nft.rarity.toLowerCase();
+    
+    switch (rarityLower) {
       case "common":
         return "bg-gradient-to-br from-primary/5 to-secondary/5";
       case "rare":
