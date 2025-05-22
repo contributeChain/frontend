@@ -9,7 +9,16 @@ import FeaturedNFTs from "@/components/profile/featured-nfts";
 import RecentActivity from "@/components/profile/recent-activity";
 import { getUserProfile } from "@/lib/githubClient";
 import { getCurrentWalletAddress, shortenAddress } from "@/lib/web3-utils";
-import { getUserByGitHubUsername, getRepositoriesByUserId, addUserToCollection, Repository, User } from "@/lib/grove-service";
+import { 
+  getUserByGitHubUsername, 
+  getRepositoriesByUserId, 
+  addUserToCollection,
+  addUserFollowActivity,
+  removeUserFollowActivity,
+  isFollowingUser,
+  Repository, 
+  User 
+} from "@/lib/grove-service";
 import { useAuth } from "@/hooks/use-auth";
 import WalletConnectButton from "@/components/wallet-connect-button";
 
@@ -28,6 +37,8 @@ export default function Profile({ username }: ProfileProps) {
   const [, navigate] = useLocation();
   const { user: authUser, isAuthenticated } = useAuth();
   const [notFound, setNotFound] = useState(false);
+  const [isFollowProcessing, setIsFollowProcessing] = useState(false);
+
   useEffect(() => {
     const loadProfileData = async () => {
       setIsLoading(true);
@@ -61,6 +72,25 @@ export default function Profile({ username }: ProfileProps) {
     loadProfileData();
   }, [username, toast, navigate, authUser, isAuthenticated]);
 
+  // Add a separate useEffect to check following status whenever user or wallet address changes
+  useEffect(() => {
+    const checkFollowStatus = async () => {
+      if (user && walletAddress && walletAddress.startsWith('0x')) {
+        try {
+          // Check if the current user is following this profile
+          console.log(`Checking follow status: wallet=${walletAddress}, userId=${user.id}`);
+          const following = await isFollowingUser(walletAddress, user.id);
+          console.log(`Follow status result: ${following}`);
+          setIsFollowing(following);
+        } catch (error) {
+          console.error("Error checking follow status:", error);
+        }
+      }
+    };
+    
+    checkFollowStatus();
+  }, [user, walletAddress]);
+
   // Load a user by GitHub username (viewing another user's profile)
   const loadUserByGitHubUsername = async (githubUsername: string) => {
     console.log(`Loading profile for GitHub username: ${githubUsername}`);
@@ -76,6 +106,13 @@ export default function Profile({ username }: ProfileProps) {
       if (userData.id) {
         const reposData = await getRepositoriesByUserId(userData.id);
         setRepositories(reposData);
+        
+        // Check if the current user is following this profile
+        const currentAddress = await getCurrentWalletAddress();
+        if (currentAddress && userData.id) {
+          const following = await isFollowingUser(currentAddress, userData.id);
+          setIsFollowing(following);
+        }
       }
     } else {
       // User not found in Grove, try to fetch from GitHub directly
@@ -192,14 +229,100 @@ export default function Profile({ username }: ProfileProps) {
     }
   };
 
-  const handleFollow = () => {
-    setIsFollowing(!isFollowing);
-    toast({
-      title: isFollowing ? "Unfollowed" : "Following",
-      description: isFollowing 
-        ? `You have unfollowed ${user?.username}`
-        : `You are now following ${user?.username}`,
-    });
+  const handleFollow = async () => {
+    console.log('handleFollow called');
+    
+    // Check if wallet is connected
+    if (!walletAddress || !walletAddress.startsWith('0x')) {
+      toast({
+        title: "Wallet Not Connected",
+        description: "Please connect your wallet to follow users",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Check if we have both the current user and the profile being viewed
+    if (!user || !authUser) {
+      toast({
+        title: "Error",
+        description: "Missing user information",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Set processing state and prepare new following state
+    setIsFollowProcessing(true);
+    const newFollowingState = !isFollowing;
+    
+    try {
+      if (newFollowingState) {
+        // Create a proper follower user object from authUser
+        const followerUser: User = {
+          id: Date.now(),
+          username: authUser.githubUser?.login || authUser.ensName || `user_${Date.now()}`,
+          githubUsername: authUser.githubUser?.login || null,
+          avatarUrl: authUser.githubUser?.avatar_url || null,
+          reputation: 0,
+          password: "",
+          walletAddress: authUser.walletAddress,
+          bio: authUser.githubUser?.bio || null,
+          location: null,
+          website: null,
+          createdAt: new Date()
+        };
+        
+        // Record the follow activity in Grove
+        console.log(`Adding follow activity: ${followerUser.username} following ${user.username}`);
+        const success = await addUserFollowActivity(
+          user, // followed user
+          followerUser, // follower user
+          walletAddress as `0x${string}` // wallet address
+        );
+        
+        if (!success) {
+          throw new Error("Failed to record follow activity");
+        }
+        
+        // Update UI after successful follow
+        setIsFollowing(true);
+        
+        toast({
+          title: "Following",
+          description: `You are now following ${user?.username}`,
+        });
+      } else {
+        // Remove follow relationship
+        console.log(`Removing follow relationship for ${user.username}`);
+        const success = await removeUserFollowActivity(
+          user, // user being unfollowed
+          walletAddress as `0x${string}` // wallet address of follower
+        );
+        
+        if (!success) {
+          throw new Error("Failed to remove follow relationship");
+        }
+        
+        // Update UI after successful unfollow
+        setIsFollowing(false);
+        
+        toast({
+          title: "Unfollowed",
+          description: `You have unfollowed ${user?.username}`,
+        });
+      }
+    } catch (error) {
+      console.error("Error handling follow action:", error);
+      // Don't update UI on error
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Something went wrong. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsFollowProcessing(false);
+    }
   };
 
   // Loading state
@@ -319,9 +442,24 @@ export default function Profile({ username }: ProfileProps) {
                             : "bg-primary hover:bg-primary/90 text-white"
                         } font-medium py-2 px-4 rounded-lg flex items-center gap-2 text-sm`}
                         onClick={handleFollow}
+                        disabled={isFollowProcessing}
                       >
-                        <i className={`fas ${isFollowing ? "fa-user-check" : "fa-user-plus"}`}></i>
-                        <span>{isFollowing ? "Following" : "Follow"}</span>
+                        {isFollowProcessing ? (
+                          <>
+                            <i className="fas fa-spinner fa-spin"></i>
+                            <span>Processing...</span>
+                          </>
+                        ) : isFollowing ? (
+                          <>
+                            <i className="fas fa-user-check"></i>
+                            <span>Following</span>
+                          </>
+                        ) : (
+                          <>
+                            <i className="fas fa-user-plus"></i>
+                            <span>Follow</span>
+                          </>
+                        )}
                       </Button>
                       <Button
                         className="bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-darkText dark:text-lightText font-medium py-2 px-4 rounded-lg text-sm"

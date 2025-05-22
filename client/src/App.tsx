@@ -15,6 +15,9 @@ import NotFound from "@/pages/not-found";
 import { GitHubCallback } from "@/components/auth/GitHubCallback";
 import LinkGitHubPage from "@/pages/link-github";
 import MintNftPage from "./pages/mint-nft";
+import NFTDetailPage from "./pages/nft-detail";
+import NftCollectionPage from "./pages/nft-collection";
+import RepositoryNFTsPage from "./pages/repository-nfts";
 import { useEffect } from "react";
 import { useAccount, useEnsName } from "wagmi";
 import { useAuthStore, useGitHubStore, useLensStore } from "./store";
@@ -87,11 +90,21 @@ function AppRoutes() {
       <Route path="/repositories/:id">
         {params => <RepositoryDetail params={params} />}
       </Route>
+      <Route path="/repositories/:id/nfts">
+        {params => <RepositoryNFTsPage params={params} />}
+      </Route>
       <Route path="/add-repository" component={AddRepository} />
       <Route path="/link-github" component={LinkGitHubPage} />
       <Route path="/github/link" component={LinkGitHubPage} />
       <Route path="/mint-nft" component={MintNftPage} />
       <Route path="/social" component={Social} />
+      <Route path="/nft-collection" component={NftCollectionPage} />
+      <Route path="/nfts/:id">
+        {params => <NFTDetailPage params={params} />}
+      </Route>
+      <Route path="/repositories/:repoId/nfts/:id">
+        {params => <NFTDetailPage params={params} />}
+      </Route>
       <Route component={NotFound} />
     </Switch>
   );

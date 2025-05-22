@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { networkConfig, lensClient, authenticateWithLens, checkLensProfile } from '@/lib/lensClient';
+import { lensClient, authenticateWithLens, checkLensProfile } from '@/lib/lensClient';
 
 interface LensState {
   hasProfile: boolean | null;
@@ -36,6 +36,7 @@ export const useLensStore = create<LensState>()(
         
         // Check if the user has a Lens profile
         const profileResult = await checkLensProfile(address);
+        console.log('profileResult', profileResult);
         
         set({ 
           isAuthenticated,
@@ -57,8 +58,9 @@ export const useLensStore = create<LensState>()(
       set({ isLoading: true });
       
       try {
-        const authResult = await authenticateWithLens(address, walletClient);
-        
+        console.log('authenticateWithLens', walletClient);
+        const authResult = await authenticateWithLens(walletClient);
+        console.log('authResult', authResult);
         if (authResult.success) {
           set({ isAuthenticated: true });
           

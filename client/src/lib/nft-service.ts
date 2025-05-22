@@ -1,9 +1,8 @@
 import { ContractFunctionExecutionError } from "viem";
 import { storageClient } from "@/lib/groveClient";
 import { createPublicClient, http, createWalletClient, custom, parseEther } from "viem";
-import { lens } from "wagmi/chains";
-import { getLensAppAddress, getNftContractAddress, DEFAULT_NETWORK, NetworkEnvironment } from "@/config/contracts";
-import { networkConfig } from "@/lib/lensClient";
+import { lens, lensTestnet } from "wagmi/chains";
+import { DEFAULT_NETWORK, getNftContractAddress } from "@/config/contracts";
 
 // ContributorNFT contract ABI (partial - only functions we need)
 const contributorNftAbi = [
@@ -117,12 +116,9 @@ const contributorNftAbi = [
 // Get contract address from config
 export const CONTRIBUTOR_NFT_ADDRESS = getNftContractAddress();
 
-// Use Lens chain based on environment (using the networkConfig from lensClient.ts)
-const chain = networkConfig;
-
-// Create a public client for read operations
+// Create a public client for read operations using the default provider for the selected chain
 const publicClient = createPublicClient({
-  chain,
+  chain: DEFAULT_NETWORK === 'mainnet' ? lens : lensTestnet,
   transport: http()
 });
 
@@ -130,10 +126,17 @@ const publicClient = createPublicClient({
  * Creates a wallet client from an ethereum provider
  */
 export function createWalletClientFromProvider(provider: any) {
-  return createWalletClient({
-    chain,
-    transport: custom(provider)
-  });
+  if(DEFAULT_NETWORK === 'mainnet') {
+    return createWalletClient({
+      chain: lens,
+      transport: custom(provider)
+    });
+  } else {
+    return createWalletClient({
+      chain: lensTestnet,
+      transport: custom(provider)
+    });
+  }
 }
 
 /**
@@ -219,8 +222,8 @@ export function generateNftImageUrl(
   const encodedRarity = encodeURIComponent(rarity.name);
   const encodedColor = encodeURIComponent(rarity.color.replace('#', ''));
   
-  // Simple SVG generation for demo purposes
-  return `https://contribution-nft-generator.vercel.app/api/generate?repo=${encodedRepo}&contributor=${encodedContributor}&score=${encodedScore}&rarity=${encodedRarity}&color=${encodedColor}`;
+  // Use our own SVG image generator
+  return `/api/nft-image/generate?repo=${encodedRepo}&contributor=${encodedContributor}&score=${encodedScore}&rarity=${encodedRarity}&color=${encodedColor}`;
 }
 
 /**
@@ -230,6 +233,7 @@ export function generateNftImageUrl(
  * @param contributor Contributor information
  * @param stats Contribution statistics
  * @param ownerAddress Owner wallet address
+ * @param customImageUrl Optional custom image URL from Grove storage
  * @param attributes Optional additional attributes
  * @returns Result of metadata creation
  */
@@ -250,6 +254,7 @@ export async function createNftMetadata(
     score: number;
   },
   ownerAddress: `0x${string}`,
+  customImageUrl?: string,
   attributes?: Array<{ trait_type: string; value: string }>
 ) {
   try {
@@ -282,11 +287,15 @@ export async function createNftMetadata(
       });
     }
 
+    // Use custom image URL if provided, otherwise generate one
+    const imageUrl = customImageUrl || 
+      generateNftImageUrl(repo, contributor.name || contributor.login, stats.score, rarity);
+
     // Create metadata object
     const metadata = {
       name,
       description,
-      image: generateNftImageUrl(repo, contributor.name || contributor.login, stats.score, rarity),
+      image: imageUrl,
       attributes: nftAttributes,
       external_url: repoUrl,
       properties: {
@@ -315,7 +324,7 @@ export async function createNftMetadata(
 
 /**
  * Mint a contribution NFT
- * @param provider Web3 provider
+ * @param client Wallet client
  * @param recipient Recipient wallet address
  * @param repoUrl Repository URL
  * @param score Contribution score
@@ -323,27 +332,27 @@ export async function createNftMetadata(
  * @returns Result of minting operation
  */
 export async function mintContributionNft(
-  provider: any | null,
+  client: any,
   recipient: `0x${string}`,
   repoUrl: string,
   score: number,
   metadataUri: string
 ): Promise<{ success: boolean; transactionHash?: string; error?: string }> {
   try {
-    console.log(`Minting NFT for ${recipient} with metadata: ${metadataUri}`);
-
-    // Get contract address from config
-    const contractAddress = getNftContractAddress() as `0x${string}`;
-    
-    if (!provider) {
-      throw new Error("Web3 provider is required for minting NFTs");
+    if (!client) {
+      throw new Error("Wallet client is required for minting NFTs");
     }
 
-    // Use the provider to create a wallet client
-    const walletClient = createWalletClientFromProvider(provider);
+    const contractAddress = getNftContractAddress() as `0x${string}`;
     
-    // Call the contract to mint the NFT
-    const hash = await walletClient.writeContract({
+    console.log("Contract Address:", contractAddress);
+    console.log("Recipient:", recipient);
+    console.log("Repo URL:", repoUrl);
+    console.log("Score:", score);
+    console.log("Metadata URI:", metadataUri);
+
+    // Prepare the transaction request
+    const request = {
       address: contractAddress,
       abi: contributorNftAbi,
       functionName: "mintContribution",
@@ -353,10 +362,12 @@ export async function mintContributionNft(
         BigInt(score),
         metadataUri
       ],
-      account: recipient
-    });
-    
-    console.log("NFT minted successfully, transaction hash:", hash);
+      account: recipient,
+      // chain: alchemyConfig.chain
+    };
+
+    // Write the contract directly without simulation
+    const hash = await client.writeContract(request);
     
     return {
       success: true,

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useLocation } from "wouter";
 import { Helmet } from "react-helmet";
 import { Input } from "@/components/ui/input";
@@ -7,7 +7,8 @@ import RepositoryCard from "@/components/repository-card";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { fetchRepositories, fetchUsers, type Repository, type User } from "@/lib/grove-service";
+import { fetchRepositories, fetchUsers, type Repository, type User, invalidateAllGroveCache } from "@/lib/grove-service";
+import { useGrove } from "@/hooks/use-grove";
 
 export default function Repositories() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -19,35 +20,39 @@ export default function Repositories() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const { isAuthenticated } = useAuth();
+  const { refreshGroveData } = useGrove();
+
+  const fetchData = useCallback(async () => {
+    setIsLoading(true);
+    
+    try {
+      // Refresh Grove data to ensure we have latest content
+      refreshGroveData();
+      
+      // Fetch repositories and users from Grove
+      const [reposData, usersData] = await Promise.all([
+        fetchRepositories(),
+        fetchUsers()
+      ]);
+      
+      setRepositories(reposData);
+      setFilteredRepositories(reposData);
+      setUsers(usersData);
+    } catch (error) {
+      console.error("Error fetching repositories:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load data from Grove. Please try again later.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [toast, refreshGroveData]);
 
   useEffect(() => {
-    const fetchData = async () => {
-      setIsLoading(true);
-      
-      try {
-        // Fetch repositories and users from Grove
-        const [reposData, usersData] = await Promise.all([
-          fetchRepositories(),
-          fetchUsers()
-        ]);
-        
-        setRepositories(reposData);
-        setFilteredRepositories(reposData);
-        setUsers(usersData);
-      } catch (error) {
-        console.error("Error fetching repositories:", error);
-        toast({
-          title: "Error",
-          description: "Failed to load data from Grove. Please try again later.",
-          variant: "destructive"
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
     fetchData();
-  }, [toast]);
+  }, [fetchData]);
 
   useEffect(() => {
     // Apply filtering based on search query and filter
@@ -134,6 +139,20 @@ export default function Repositories() {
                 Add Repository
               </Button>
               
+              <Button 
+                onClick={fetchData}
+                disabled={isLoading} 
+                variant="outline"
+                className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
+              >
+                {isLoading ? (
+                  <div className="w-4 h-4 border-2 border-t-transparent border-primary rounded-full animate-spin mr-2"></div>
+                ) : (
+                  <i className="fas fa-sync-alt mr-2"></i>
+                )}
+                Refresh
+              </Button>
+              
               <div className="relative flex-1 md:flex-none">
                 <form onSubmit={handleSearch}>
                   <Input 
@@ -190,6 +209,7 @@ export default function Repositories() {
                       key={repository.id} 
                       repository={repository} 
                       username={getUsernameForRepository(repository.userId)} 
+                      onRefresh={fetchData}
                     />
                   ))}
                 </div>

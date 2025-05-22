@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
-import { ProfileMetadata, ProfileAttribute, MetadataAttributeType } from '@/lib/lensClient';
+import { ProfileMetadata, ProfileAttribute } from '@/lib/lensClient';
+import { MetadataAttributeType } from '@lens-protocol/metadata';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -540,4 +541,4 @@ if (typeof document !== 'undefined') {
     styleElement.setAttribute('data-lens-styles', 'true');
     document.head.appendChild(styleElement);
   }
-} 
+}

@@ -1,7 +1,7 @@
 import { ReactNode, createContext, useState, useEffect, useRef, useCallback, useContext } from 'react';
 import { useAccount, useWalletClient } from 'wagmi';
 import { useToast } from '@/hooks/use-toast';
-import { checkLensProfile, authenticateWithLens, lensClient } from '@/lib/lensClient';
+import {  lensClient } from '@/lib/lensClient';
 import { useLensStore } from '@/store';
 
 // Define the LensSession type locally since it's not exported
@@ -13,7 +13,7 @@ type LensSession = {
 
 export type LensContextType = {
   isAuthenticated: boolean;
-  authenticate: () => Promise<boolean>;
+  authenticate: (address: string, walletClient: any) => Promise<boolean>;
   logout: () => Promise<void>;
   hasProfile: boolean | null;
   isLoading: boolean;
@@ -22,7 +22,7 @@ export type LensContextType = {
 
 export const LensContext = createContext<LensContextType>({
   isAuthenticated: false,
-  authenticate: async () => false,
+  authenticate: async (address: string, walletClient: any) => false,
   logout: async () => {},
   hasProfile: null,
   isLoading: false,
@@ -99,9 +99,9 @@ export default function LensProvider({ children }: { children: ReactNode }) {
       });
       return false;
     }
-    
+    console.log('walletClient authenticate', walletClient);
     const success = await storeAuthenticate(address, walletClient);
-    
+    console.log('walletClient authenticate success', success);
     if (success) {
       // Try to get the session client
       try {

@@ -8,10 +8,10 @@ import {
   base,
   zora,
   lens,
+  lensTestnet,
 } from 'wagmi/chains';
 import { http } from 'wagmi';
 import '@rainbow-me/rainbowkit/styles.css';
-import { networkConfig } from '@/lib/lensClient';
 import { HelmetProvider } from 'react-helmet-async';
 import LensProvider from './LensProvider';
 
@@ -24,14 +24,14 @@ const projectId = import.meta.env.VITE_WALLET_CONNECT_PROJECT_ID || "095afbef7b1
 const config = getDefaultConfig({
   appName: 'Lens Alchemy',
   projectId,
-  chains: [mainnet, polygon, base, zora, lens, networkConfig],
+  chains: [mainnet, polygon, base, zora, lens, lensTestnet],
   transports: {
     [mainnet.id]: http(),
     [polygon.id]: http(),
     [base.id]: http(),
     [zora.id]: http(),
     [lens.id]: http(),
-    [networkConfig.id]: http(networkConfig.rpcUrls.default.http[0]),
+    [lensTestnet.id]: http(),
   },
 });
 

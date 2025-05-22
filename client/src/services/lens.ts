@@ -120,15 +120,16 @@ class LensService {
    * @param content Publication content
    * @param walletClient Wallet client for authentication
    */
-  async createPublication(address: string, content: PublicationContent, walletClient: any) {
+  async createPublication(content: PublicationContent, walletClient: any) {
     try {
       // First authenticate with Lens if not already authenticated
+      console.log('walletClient create publication', walletClient);
       const resumed = await lensClient.resumeSession();
       let sessionClient;
       
       if (resumed.isErr() && walletClient) {
         // Need to authenticate
-        const auth = await authenticateWithLens(address, walletClient);
+        const auth = await authenticateWithLens(walletClient);
         if (!auth.success) {
           return { success: false, error: 'Authentication failed' };
         }
@@ -242,7 +243,7 @@ class LensService {
       
       if (resumed.isErr() && walletClient) {
         // Need to authenticate
-        const auth = await authenticateWithLens(address, walletClient);
+        const auth = await authenticateWithLens(walletClient);
         if (!auth.success) {
           return { success: false, error: 'Authentication failed' };
         }
@@ -352,7 +353,7 @@ class LensService {
       
       if (resumed.isErr() && walletClient) {
         // Need to authenticate
-        const auth = await authenticateWithLens(address, walletClient);
+        const auth = await authenticateWithLens(walletClient);
         if (!auth.success) {
           return { success: false, error: 'Authentication failed' };
         }
@@ -410,7 +411,7 @@ class LensService {
       
       if (resumed.isErr() && walletClient) {
         // Need to authenticate
-        const auth = await authenticateWithLens(address, walletClient);
+        const auth = await authenticateWithLens(walletClient);
         if (!auth.success) {
           return { success: false, error: 'Authentication failed' };
         }
@@ -456,3 +457,5 @@ class LensService {
 
 // Export a singleton instance
 export const lensService = new LensService(); 
+
+

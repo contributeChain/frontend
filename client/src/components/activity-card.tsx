@@ -6,7 +6,7 @@ import { useState } from "react";
 import { lensService } from "@/services/lens";
 import { useToast } from "@/hooks/use-toast";
 import { LensPostMetadata, LensTag } from "@/types/lens";
-
+import { useWalletClient } from "wagmi";
 interface ActivityCardProps {
   activity: Activity;
   user: User;
@@ -20,7 +20,7 @@ export default function ActivityCard({ activity, user, isLoading = false }: Acti
   const [commentCount, setCommentCount] = useState(Math.floor(Math.random() * 20));
   const [likeCount, setLikeCount] = useState(Math.floor(Math.random() * 100) + 1);
   const { toast } = useToast();
-  
+  const { data: walletClient } = useWalletClient();
   // Cast metadata to our type to help TypeScript
   const metadata = activity.activity.metadata as unknown as {
     tags?: Array<LensTag>;
@@ -90,8 +90,9 @@ export default function ActivityCard({ activity, user, isLoading = false }: Acti
         // Use createComment instead of commentOnPost
         const result = await lensService.createComment("0x1234", postId, {
           content: commentText,
-          tags: ["lens-alchemy", "comment"]
-        }, null);
+          tags: ["lens-alchemy", "comment"],
+          
+        }, walletClient);
         
         if (result.success) {
           setCommentText("");

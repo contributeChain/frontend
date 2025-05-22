@@ -8,7 +8,8 @@ import { useToast } from '@/hooks/use-toast';
 import { useAccount, useWalletClient } from 'wagmi';
 import { useLens } from '@/hooks/use-lens';
 import { useAuth } from '@/hooks/use-auth';
-import { createLensProfile, checkLensProfile } from '@/lib/lensClient';
+import { MetadataAttributeType } from '@lens-protocol/metadata';
+import { createLensProfileWithMetadata, checkLensProfile, ProfileMetadata } from '@/lib/lensClient';
 import { 
   Dialog,
   DialogContent,
@@ -82,7 +83,7 @@ export default function LensPostForm() {
     try {
       // First authenticate with Lens if not already authenticated
       if (!isAuthenticated) {
-        const authResult = await authenticate();
+        const authResult = await authenticate(address, walletClient);
         
         if (!authResult) {
           throw new Error("Failed to authenticate with Lens");
@@ -95,9 +96,21 @@ export default function LensPostForm() {
       }
       
       // Create a Lens profile with the username
-      const profileResult = await createLensProfile(username, sessionClient);
+      const profileMetadata: ProfileMetadata = {
+        name: username,
+        bio: user?.githubUser?.bio || '',
+        picture: user?.githubUser?.avatar_url || '',
+        attributes: [
+          {
+            key: "twitter",
+            type: MetadataAttributeType.STRING,
+            value: "https://twitter.com/username",
+          },
+        ],
+      }
+      const profileResult = await createLensProfileWithMetadata(sessionClient, walletClient, username, address, profileMetadata);
       
-      if (profileResult.success) {
+      if (!profileResult) {
         toast({
           title: 'Profile Created',
           description: `Your Lens profile ${username} has been created successfully!`,
@@ -108,7 +121,7 @@ export default function LensPostForm() {
         if (address) {
           const profileCheck = await checkLensProfile(address);
           
-          if (profileCheck.success) {
+          if (profileCheck.hasProfile) {
             // Update UI states
             setShowCreateProfileDialog(false);
             // Force page reload to update all components with new profile state
@@ -116,7 +129,7 @@ export default function LensPostForm() {
           }
         }
       } else {
-        throw new Error(profileResult.error?.message || "Failed to create profile");
+        throw new Error("Failed to create profile, profileResult: " + profileResult);
       }
     } catch (error) {
       console.error('Error creating profile:', error);
@@ -132,7 +145,7 @@ export default function LensPostForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+    console.log('walletClient lens post form', walletClient);
     if (!content.trim()) {
       toast({
         title: 'Error',
@@ -141,6 +154,7 @@ export default function LensPostForm() {
       });
       return;
     }
+    console.log('walletClient lens post form', walletClient);
     
     if (!address) {
       toast({
@@ -150,15 +164,16 @@ export default function LensPostForm() {
       });
       return;
     }
-    
+    console.log('walletClient lens post form', walletClient);
     if (hasProfile === false) {
       setShowCreateProfileDialog(true);
       return;
     }
+    console.log('walletClient lens post form', walletClient);
     
     // Make sure we're authenticated
     if (!isAuthenticated) {
-      const authResult = await authenticate();
+      const authResult = await authenticate(address, walletClient);
       
       if (!authResult) {
         toast({
@@ -169,12 +184,12 @@ export default function LensPostForm() {
         return;
       }
     }
-    
+    console.log('walletClient lens post form', walletClient);
     setIsSubmitting(true);
-    
+    console.log('walletClient lens post form submitting', walletClient);
     try {
+      console.log('walletClient lens post form', walletClient);
       const result = await lensService.createPublication(
-        address,
         {
           content,
           title: title || undefined,

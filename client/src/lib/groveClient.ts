@@ -1,16 +1,17 @@
 import { StorageClient, immutable, lensAccountOnly } from "@lens-chain/storage-client";
 import { networkConfig } from "./lensClient";
-
+import { DEFAULT_NETWORK } from "@/config/contracts";
+import { lens, lensTestnet } from "wagmi/chains";
 // Initialize Grove storage client
 export const storageClient = StorageClient.create();
 
 // ACL configuration helpers
 export const createImmutableACL = () => {
-  return immutable(networkConfig.id);
+  return immutable(DEFAULT_NETWORK === 'mainnet' ? lens.id : lensTestnet.id);
 };
 
 export const createLensAccountACL = (accountAddress: `0x${string}`) => {
-  return lensAccountOnly(accountAddress, networkConfig.id);
+  return lensAccountOnly(accountAddress, DEFAULT_NETWORK === 'mainnet' ? lens.id : lensTestnet.id);
 };
 
 // File upload configuration
@@ -64,7 +65,7 @@ export async function uploadJson(
   const acl = createLensAccountACL(accountAddress);
   
   try {
-    const response = await storageClient.uploadAsJson(data, { acl });
+    const response = await storageClient.uploadAsJson(data);
     return response;
   } catch (error) {
     console.error('Error uploading JSON to Grove:', error);

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Helmet } from "react-helmet";
 import { Button } from "@/components/ui/button";
 import ActivityCard from "@/components/activity-card";
@@ -8,16 +8,15 @@ import PopularTags from "@/components/social/popular-tags";
 import { useToast } from "@/hooks/use-toast";
 import { lensService, PageSize } from "@/services/lens";
 import { LensPostMetadata } from "@/types/lens";
-import LensPostForm from "@/components/lens-post-form";
-import { useAccount, useConnect } from "wagmi";
+import { useAccount } from "wagmi";
 import { useLens } from "@/hooks/use-lens";
 import { 
   Alert,
   AlertTitle,
   AlertDescription 
 } from "@/components/ui/alert";
-import { Activity, User } from "@/lib/grove-service";
-import WalletConnectButton from "@/components/wallet-connect-button";
+import { Activity, User, invalidateAllGroveCache } from "@/lib/grove-service";
+import { useGrove } from "@/hooks/use-grove";
 
 export default function Social() {
   const [activities, setActivities] = useState<{activity: Activity, user: User}[]>([]);
@@ -26,12 +25,11 @@ export default function Social() {
   const [cursor, setCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  
   const { toast } = useToast();
   const { isConnected } = useAccount();
   const { hasProfile } = useLens();
-
-  // Determine if viewing as guest
-  const isGuestMode = !isConnected || hasProfile === false;
+  const { refreshGroveData } = useGrove();
 
   useEffect(() => {
     fetchActivities(true);
@@ -40,13 +38,16 @@ export default function Social() {
   const fetchActivities = async (reset = false) => {
     if (reset) {
       setIsLoading(true);
+      setCursor(null); // Reset cursor when fetching from the beginning
     } else {
       setLoadingMore(true);
     }
     
     try {
+      // First refresh Grove data to ensure we have latest content
+      refreshGroveData();
+      
       // Use Lens service to fetch posts from the Lens Protocol
-      // If reset is true, fetch from the beginning, otherwise use the cursor
       const result = await lensService.fetchFeed(
         PageSize.Ten,
         reset ? null : cursor
@@ -84,7 +85,17 @@ export default function Social() {
 
   const handleFilterChange = (newFilter: string) => {
     setFilter(newFilter);
+    // Reset and fetch activities with new filter
+    setCursor(null);
+    fetchActivities(true);
   };
+
+  // Add function to handle refresh
+  const handleManualRefresh = useCallback(() => {
+    // Invalidate Grove cache and fetch activities again
+    refreshGroveData();
+    fetchActivities(true);
+  }, [refreshGroveData]);
 
   // Show loading skeletons
   const renderLoadingSkeletons = () => {
@@ -100,7 +111,7 @@ export default function Social() {
             createdAt: new Date(),
             metadata: {}
           }
-        } as Activity}
+        } as any}
         user={{
           id: 0,
           username: "",
@@ -141,225 +152,191 @@ export default function Social() {
         <meta name="description" content="Stay up to date with the latest developer activities, NFT mints, and achievements in the Lens Alchemy community." />
       </Helmet>
       
-      <section className="py-16">
+      <section className="py-12">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center mb-8">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
             <div>
-              <h2 className="text-3xl md:text-4xl font-display font-bold">Developer Social Feed</h2>
+              <h2 className="text-3xl md:text-4xl font-display font-bold bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">Developer Social Feed</h2>
               <p className="text-gray-600 dark:text-gray-400 mt-2">Stay up to date with the latest developer activities</p>
             </div>
-          </div>
-          
-          {isGuestMode && (
-            <Alert className="mb-8 border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30">
+            
+            <Button 
+              variant="outline" 
+              onClick={handleManualRefresh} 
+              className="gap-2 group relative overflow-hidden"
+              disabled={isLoading}
+            >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                className="h-5 w-5 text-amber-600"
+                className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`}
               >
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38" />
               </svg>
-              <AlertTitle className="text-amber-800 dark:text-amber-400">Guest Mode</AlertTitle>
-              <AlertDescription className="text-amber-700 dark:text-amber-300">
-                You're browsing in guest mode. Connect your wallet and create a Lens profile to interact with posts and create your own content.
-              </AlertDescription>
-            </Alert>
-          )}
-          
-          <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
-            <div className="flex items-center gap-2 flex-wrap">
-              <Button 
-                onClick={() => {
-                  handleFilterChange("all");
-                  // Reset feed when changing filters
-                  setCursor(null);
-                  fetchActivities(true);
-                }}
-                className={`text-sm px-3 py-1 rounded-full ${filter === "all" ? "bg-primary text-white" : "bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-400"}`}
-                variant="ghost"
-              >
-                All
-              </Button>
-              <Button 
-                onClick={() => {
-                  handleFilterChange("nft_mints");
-                  // Reset feed when changing filters
-                  setCursor(null);
-                  fetchActivities(true);
-                }}
-                className={`text-sm px-3 py-1 rounded-full ${filter === "nft_mints" ? "bg-primary text-white" : "bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-400"}`}
-                variant="ghost"
-              >
-                NFT Mints
-              </Button>
-              <Button 
-                onClick={() => {
-                  handleFilterChange("achievements");
-                  // Reset feed when changing filters
-                  setCursor(null);
-                  fetchActivities(true);
-                }}
-                className={`text-sm px-3 py-1 rounded-full ${filter === "achievements" ? "bg-primary text-white" : "bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-400"}`}
-                variant="ghost"
-              >
-                Achievements
-              </Button>
-              <Button 
-                onClick={() => {
-                  handleFilterChange("contributions");
-                  // Reset feed when changing filters
-                  setCursor(null);
-                  fetchActivities(true);
-                }}
-                className={`text-sm px-3 py-1 rounded-full ${filter === "contributions" ? "bg-primary text-white" : "bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-400"}`}
-                variant="ghost"
-              >
-                Contributions
-              </Button>
-              <Button 
-                onClick={() => {
-                  handleFilterChange("lens_posts");
-                  // Reset feed when changing filters
-                  setCursor(null);
-                  fetchActivities(true);
-                }}
-                className={`text-sm px-3 py-1 rounded-full ${filter === "lens_posts" ? "bg-primary text-white" : "bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-400"}`}
-                variant="ghost"
-              >
-                Lens Posts
-              </Button>
-            </div>
-            
-            {isGuestMode && (
-              <WalletConnectButton />
-            )}
+              Refresh
+              <div className="absolute inset-0 bg-primary/10 transform translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
+            </Button>
           </div>
           
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <div className="lg:col-span-8 space-y-6">
-              <div className="mb-8">
-                <LensPostForm />
+          <div className="mb-8 sticky top-0 z-10 bg-white/80 dark:bg-gray-950/80 backdrop-blur-md py-3 rounded-xl shadow-sm">
+            <div className="flex flex-nowrap items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
+              {["all", "nft_mints", "achievements", "contributions", "lens_posts"].map((filterType) => (
+                <Button 
+                  key={filterType}
+                  onClick={() => handleFilterChange(filterType)}
+                  className={`text-sm whitespace-nowrap px-4 py-2 rounded-full transition-all duration-300 ${
+                    filter === filterType 
+                      ? "bg-gradient-to-r from-primary to-blue-600 text-white shadow-md" 
+                      : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
+                  }`}
+                  variant="ghost"
+                >
+                  {filterType === "all" ? "All" : 
+                   filterType === "nft_mints" ? "NFT Mints" : 
+                   filterType === "achievements" ? "Achievements" : 
+                   filterType === "contributions" ? "Contributions" : 
+                   "Lens Posts"}
+                </Button>
+              ))}
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <div className="lg:col-span-8 space-y-8">
+              {/* Coming Soon Post Creation Section */}
+              <div className="bg-gradient-to-br from-primary/5 to-blue-600/5 dark:from-primary/10 dark:to-blue-600/10 rounded-xl p-8 border border-primary/10 relative overflow-hidden shadow-sm backdrop-blur-sm">
+                <div className="absolute -top-12 -right-12 w-40 h-40 bg-primary/10 rounded-full blur-3xl"></div>
+                <div className="absolute -bottom-8 -left-8 w-32 h-32 bg-blue-600/10 rounded-full blur-2xl"></div>
+                
+                <div className="relative z-10">
+                  <h3 className="text-xl font-semibold mb-3 text-primary">Create Post</h3>
+                  <div className="bg-white/70 dark:bg-gray-900/70 rounded-lg p-6 backdrop-blur-sm">
+                    <div className="flex items-center space-x-3 mb-4">
+                      <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+                        <svg 
+                          xmlns="http://www.w3.org/2000/svg" 
+                          viewBox="0 0 24 24" 
+                          fill="none" 
+                          stroke="currentColor" 
+                          strokeWidth="2" 
+                          strokeLinecap="round" 
+                          strokeLinejoin="round" 
+                          className="w-5 h-5 text-gray-500 dark:text-gray-400"
+                        >
+                          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                          <circle cx="12" cy="7" r="4"></circle>
+                        </svg>
+                      </div>
+                      <div className="h-10 flex-1 bg-gray-100 dark:bg-gray-800 rounded-full"></div>
+                    </div>
+                    
+                    <div className="mt-4 flex justify-center">
+                      <div className="text-center px-6 py-8">
+                        <h4 className="text-lg font-medium mb-2 bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">Coming Soon!</h4>
+                        <p className="text-gray-500 dark:text-gray-400">
+                          We're working on an enhanced posting experience for developers.
+                          <br />Stay tuned for updates!
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
               
               {isLoading && activities.length === 0 ? (
                 <div className="space-y-6">
                   {renderLoadingSkeletons()}
                 </div>
-              ) : (
-                <>
-                  {filteredActivities.length === 0 ? (
-                    <div className="bg-white dark:bg-gray-800 rounded-xl p-8 text-center">
-                      <i className="fas fa-rss text-4xl text-gray-400 mb-4"></i>
-                      <h3 className="text-xl font-display font-bold mb-2">No activities found</h3>
-                      <p className="text-gray-600 dark:text-gray-400">
-                        {isGuestMode 
-                          ? filter === "all"
-                            ? "You're browsing as a guest. Content is limited to public posts."
-                            : `No ${filter.replace('_', ' ')} found matching the current filter.` 
-                          : "No activities match the current filter. Try a different filter or follow more developers."}
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="space-y-6">
-                      {filteredActivities.map(({ activity, user }) => (
-                        <ActivityCard key={activity.activity.id} activity={activity} user={user} />
-                      ))}
-                      
-                      {/* Show loading skeletons when loading more */}
-                      {loadingMore && renderLoadingSkeletons()}
-                      
-                      {isGuestMode && filteredActivities.length > 0 && (
-                        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 mt-4">
-                          <div className="flex items-center">
-                            <div className="bg-primary/10 p-2 rounded-full mr-3">
-                              <svg className="w-5 h-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                              </svg>
-                            </div>
-                            <div>
-                              <h4 className="font-medium text-sm">Guest mode limitations</h4>
-                              <p className="text-xs text-gray-600 dark:text-gray-400">
-                                Connect your wallet and create a Lens profile to like, comment, and create your own posts.
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
+              ) : filteredActivities.length > 0 ? (
+                <div className="space-y-6">
+                  {filteredActivities.map((activity) => (
+                    <ActivityCard
+                      key={activity.activity.activity.id}
+                      activity={activity.activity}
+                      user={activity.user}
+                    />
+                  ))}
                   
-                  {filteredActivities.length > 0 && (
-                    <div className="flex justify-center mt-6">
-                      <Button 
+                  {hasMore && (
+                    <div className="mt-8 flex justify-center">
+                      <Button
+                        onClick={() => fetchActivities()}
+                        disabled={loadingMore}
                         variant="outline"
-                        className="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-darkText dark:text-lightText font-medium py-2 px-6 rounded-lg border border-gray-200 dark:border-gray-700 flex items-center gap-2"
-                        onClick={() => fetchActivities(false)}
-                        disabled={isLoading || loadingMore || !hasMore}
+                        className="px-8 py-6 rounded-xl group relative overflow-hidden"
                       >
-                        {loadingMore ? (
-                          <>
-                            <span>Loading more posts...</span>
-                            <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin ml-2"></div>
-                          </>
-                        ) : !hasMore ? (
-                          <span>No more posts</span>
-                        ) : (
-                          <>
-                            <span>Load More</span>
-                            <i className="fas fa-chevron-down"></i>
-                          </>
-                        )}
+                        <span className="relative z-10 flex items-center gap-2">
+                          {loadingMore ? (
+                            <>
+                              <svg className="animate-spin h-5 w-5 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                              <span>Loading more activities...</span>
+                            </>
+                          ) : (
+                            <>
+                              <svg 
+                                xmlns="http://www.w3.org/2000/svg" 
+                                width="24" 
+                                height="24" 
+                                viewBox="0 0 24 24" 
+                                fill="none" 
+                                stroke="currentColor" 
+                                strokeWidth="2" 
+                                strokeLinecap="round" 
+                                strokeLinejoin="round" 
+                                className="h-5 w-5"
+                              >
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                              </svg>
+                              <span>Load More Activities</span>
+                            </>
+                          )}
+                        </span>
+                        <div className="absolute inset-0 bg-primary/5 transform translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
                       </Button>
                     </div>
                   )}
-                </>
-              )}
-            </div>
-            
-            <div className="lg:col-span-4">
-              <TrendingDevelopers />
-              <PopularNFTs />
-              <PopularTags />
-              
-              {isGuestMode && (
-                <div className="bg-primary-50 dark:bg-primary-900/20 p-5 rounded-xl mt-6 border border-primary-100 dark:border-primary-800">
-                  <h3 className="font-bold text-primary-900 dark:text-primary-400 text-lg mb-3">Why Create a Lens Profile?</h3>
-                  <ul className="space-y-2">
-                    <li className="flex items-start">
-                      <svg className="w-5 h-5 text-primary-600 dark:text-primary-400 mr-2 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                      <span className="text-sm">Own your content and social graph</span>
-                    </li>
-                    <li className="flex items-start">
-                      <svg className="w-5 h-5 text-primary-600 dark:text-primary-400 mr-2 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                      <span className="text-sm">Share GitHub contributions on-chain</span>
-                    </li>
-                    <li className="flex items-start">
-                      <svg className="w-5 h-5 text-primary-600 dark:text-primary-400 mr-2 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                      <span className="text-sm">Earn rewards for your contributions</span>
-                    </li>
-                    <li className="flex items-start">
-                      <svg className="w-5 h-5 text-primary-600 dark:text-primary-400 mr-2 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                      <span className="text-sm">Build your reputation across Web2 & Web3</span>
-                    </li>
-                  </ul>
-                  <Button className="w-full mt-4" size="sm">
-                    Connect Wallet & Create Profile
+                </div>
+              ) : (
+                <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 rounded-xl p-8 text-center shadow-sm">
+                  <div className="w-16 h-16 bg-gray-200 dark:bg-gray-700 rounded-full mx-auto mb-4 flex items-center justify-center">
+                    <svg 
+                      xmlns="http://www.w3.org/2000/svg" 
+                      viewBox="0 0 24 24" 
+                      fill="none" 
+                      stroke="currentColor" 
+                      strokeWidth="2" 
+                      strokeLinecap="round" 
+                      strokeLinejoin="round" 
+                      className="w-8 h-8 text-gray-400"
+                    >
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <line x1="12" y1="8" x2="12" y2="12"></line>
+                      <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-medium text-gray-700 dark:text-gray-300 mb-2">No activities found</h3>
+                  <p className="text-gray-500 dark:text-gray-400 mb-4">Try changing the filter or check back later.</p>
+                  <Button onClick={handleManualRefresh} variant="outline">
+                    Refresh Feed
                   </Button>
                 </div>
               )}
+            </div>
+            
+            <div className="lg:col-span-4 space-y-8">
+              <TrendingDevelopers />
+              <PopularNFTs />
+              <PopularTags />
             </div>
           </div>
         </div>

@@ -14,6 +14,7 @@ export interface NFT {
   name: string;
   description: string;
   imageUrl: string;
+  image?: string;  // Added for direct image URL from IPFS or other sources
   rarity: string; // Changed from enum to string to be compatible with Grove NFT type
   repoName?: string;
   mintedAt: Date;
