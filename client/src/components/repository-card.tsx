@@ -175,32 +175,32 @@ export default function RepositoryCard({ repository, username, onRefresh }: Repo
   };
   
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-100 dark:border-gray-700 overflow-hidden transition-all duration-200 hover:shadow-lg hover:border-primary/20 dark:hover:border-primary/20">
+    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-100 dark:border-gray-700 overflow-hidden transition-all duration-200 hover:shadow-lg hover:border-primary/20 dark:hover:border-primary/20 flex flex-col h-full">
       <Link href={`/repositories/${repository.id}`}>
-        <a className="block cursor-pointer">
-          <div className="p-6">
+        <a className="block cursor-pointer flex-1">
+          <div className="p-6 h-full flex flex-col">
             <div className="flex justify-between items-start mb-4">
-              <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 ${getIconColorClass()} rounded-full flex items-center justify-center`}>
+              <div className="flex items-center gap-3 min-w-0">
+                <div className={`w-10 h-10 ${getIconColorClass()} rounded-full flex items-center justify-center flex-shrink-0`}>
                   <i className={`fas ${getRepositoryIcon()}`}></i>
                 </div>
-                <div>
-                  <h3 className="font-display font-bold text-lg">{repository.name}</h3>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">by {username}</p>
+                <div className="min-w-0">
+                  <h3 className="font-display font-bold text-lg truncate">{repository.name}</h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 truncate">by {username}</p>
                 </div>
               </div>
-              <div className="flex items-center gap-1">
-                <div className={`text-xs px-2 py-1 ${getTagColorClass()} rounded-full`}>
+              <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+                <div className={`text-xs px-2 py-1 ${getTagColorClass()} rounded-full whitespace-nowrap`}>
                   {getRepositoryTag()}
                 </div>
               </div>
             </div>
             
-            <p className="text-gray-600 dark:text-gray-400 text-sm mb-4">
+            <p className="text-gray-600 dark:text-gray-400 text-sm mb-4 line-clamp-2 break-words">
               {repository.description || "No description provided."}
             </p>
             
-            <div className="flex justify-between items-center text-sm">
+            <div className="flex justify-between items-center text-sm mt-auto">
               <div className="flex items-center gap-4">
                 <span className="flex items-center gap-1 text-gray-500 dark:text-gray-400">
                   <i className="fas fa-star"></i>
@@ -220,12 +220,12 @@ export default function RepositoryCard({ repository, username, onRefresh }: Repo
         </a>
       </Link>
       
-      <div className="border-t border-gray-100 dark:border-gray-700 p-4">
+      <div className="border-t border-gray-100 dark:border-gray-700 p-4 mt-auto">
         <div className="flex justify-between items-center">
-          <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+          <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 truncate">
             <span>Updated {repository.lastUpdated ? formatTimeAgo(repository.lastUpdated) : 'recently'}</span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-shrink-0">
             {isConnected && (
               <Button
                 size="sm" 

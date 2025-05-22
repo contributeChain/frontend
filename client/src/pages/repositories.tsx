@@ -21,6 +21,10 @@ export default function Repositories() {
   const { toast } = useToast();
   const { isAuthenticated } = useAuth();
   const { refreshGroveData } = useGrove();
+  
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const reposPerPage = 9;
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
@@ -82,6 +86,8 @@ export default function Repositories() {
       }
       
       setFilteredRepositories(filtered);
+      // Reset to first page when filters change
+      setCurrentPage(1);
     };
     
     applyFilters();
@@ -113,6 +119,49 @@ export default function Repositories() {
   const getUsernameForRepository = (userId: number): string => {
     const user = users.find(user => user.id === userId);
     return user ? user.username : `User ${userId}`;
+  };
+  
+  // Pagination logic
+  const indexOfLastRepo = currentPage * reposPerPage;
+  const indexOfFirstRepo = indexOfLastRepo - reposPerPage;
+  const currentRepos = filteredRepositories.slice(indexOfFirstRepo, indexOfLastRepo);
+  const totalPages = Math.ceil(filteredRepositories.length / reposPerPage);
+  
+  // Pagination component
+  const Pagination = () => {
+    if (totalPages <= 1) return null;
+    
+    return (
+      <div className="flex justify-center items-center mt-8 gap-2">
+        <Button 
+          variant="outline" 
+          size="icon"
+          disabled={currentPage === 1}
+          onClick={() => setCurrentPage(currentPage - 1)}
+          className="h-8 w-8"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="15 18 9 12 15 6"></polyline>
+          </svg>
+        </Button>
+        
+        <div className="flex items-center text-sm">
+          Page {currentPage} of {totalPages}
+        </div>
+        
+        <Button 
+          variant="outline" 
+          size="icon"
+          disabled={currentPage === totalPages}
+          onClick={() => setCurrentPage(currentPage + 1)}
+          className="h-8 w-8"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
+        </Button>
+      </div>
+    );
   };
 
   return (
@@ -203,16 +252,21 @@ export default function Repositories() {
           ) : (
             <>
               {filteredRepositories.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {filteredRepositories.map((repository) => (
-                    <RepositoryCard 
-                      key={repository.id} 
-                      repository={repository} 
-                      username={getUsernameForRepository(repository.userId)} 
-                      onRefresh={fetchData}
-                    />
-                  ))}
-                </div>
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {currentRepos.map((repository) => (
+                      <RepositoryCard 
+                        key={repository.id} 
+                        repository={repository} 
+                        username={getUsernameForRepository(repository.userId)} 
+                        onRefresh={fetchData}
+                      />
+                    ))}
+                  </div>
+                  
+                  {/* Pagination controls */}
+                  <Pagination />
+                </>
               ) : (
                 <div className="bg-white dark:bg-gray-800 rounded-xl p-8 text-center">
                   <i className="fas fa-search text-4xl text-gray-400 mb-4"></i>
@@ -220,18 +274,6 @@ export default function Repositories() {
                   <p className="text-gray-600 dark:text-gray-400">
                     No repositories match your current search and filter criteria. Try adjusting your search.
                   </p>
-                </div>
-              )}
-              
-              {filteredRepositories.length > 9 && (
-                <div className="mt-10 flex justify-center">
-                  <Button 
-                    variant="outline"
-                    className="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-darkText dark:text-lightText font-medium py-2 px-6 rounded-lg border border-gray-200 dark:border-gray-700 flex items-center gap-2"
-                  >
-                    <span>Load More Repositories</span>
-                    <i className="fas fa-arrow-down"></i>
-                  </Button>
                 </div>
               )}
             </>
