@@ -3,6 +3,7 @@ import { useAccount, useWalletClient } from 'wagmi';
 import { useToast } from '@/hooks/use-toast';
 import { lensClient } from '@/lib/lensClient';
 import { useLensStore } from '@/store';
+import { useNetworkStore, NetworkType } from '@/config/network';
 
 // Define the LensSession type locally since it's not exported
 type LensSession = {
@@ -18,6 +19,7 @@ export type LensContextType = {
   hasProfile: boolean | null;
   isLoading: boolean;
   sessionClient: any | null;
+  network: NetworkType;
 };
 
 export const LensContext = createContext<LensContextType>({
@@ -27,6 +29,7 @@ export const LensContext = createContext<LensContextType>({
   hasProfile: null,
   isLoading: false,
   sessionClient: null,
+  network: 'testnet',
 });
 
 // Hook to use the Lens context
@@ -43,6 +46,9 @@ function LensProvider({ children }: { children: ReactNode }) {
     checkAuth: storeCheckAuth
   } = useLensStore();
   
+  // Get network state
+  const { network } = useNetworkStore();
+  
   // Local state to track sessionClient which isn't tracked in the store
   const [sessionClient, setSessionClient] = useState<any>(null);
   
@@ -53,6 +59,28 @@ function LensProvider({ children }: { children: ReactNode }) {
   
   // For tracking component mount status
   const isMountedRef = useRef(true);
+  
+  // Handle network changes
+  useEffect(() => {
+    if (storeIsAuthenticated && address) {
+      // Force logout and re-auth when network changes
+      storeLogout();
+      toast({
+        title: "Network Changed",
+        description: `Switched to ${network === 'mainnet' ? 'Lens Mainnet' : 'Lens Testnet'}. Please re-authenticate.`,
+        variant: "default"
+      });
+    }
+    
+    // Reset session client
+    setSessionClient(null);
+    
+    // Update lens client with new environment
+    import('@/lib/lensClient').then(({ setLensEnvironment }) => {
+      setLensEnvironment(network);
+    });
+    
+  }, [network, storeLogout, toast]);
   
   // Update session client when authenticated state changes
   useEffect(() => {
@@ -110,7 +138,7 @@ function LensProvider({ children }: { children: ReactNode }) {
           
           toast({
             title: "Authentication Successful",
-            description: "You're now connected to Lens Protocol",
+            description: `You're now connected to Lens ${network === 'mainnet' ? 'Mainnet' : 'Testnet'}`,
             variant: "default"
           });
         }
@@ -120,7 +148,7 @@ function LensProvider({ children }: { children: ReactNode }) {
     } else {
       toast({
         title: "Authentication Failed",
-        description: "Failed to authenticate with Lens Protocol",
+        description: `Failed to authenticate with Lens ${network === 'mainnet' ? 'Mainnet' : 'Testnet'}`,
         variant: "destructive"
       });
     }
@@ -148,6 +176,7 @@ function LensProvider({ children }: { children: ReactNode }) {
         hasProfile: storeHasProfile,
         isLoading: storeIsLoading,
         sessionClient,
+        network,
       }}
     >
       {children}

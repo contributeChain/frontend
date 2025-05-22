@@ -23,6 +23,7 @@ import {
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { Menu, Search, X, ChevronDown, Home, Github, Code, Sun, Moon, Plus, User, LogOut, Settings, Blocks, Wallet, Link as LinkIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { NetworkSwitcher } from "@/components/network-switcher";
 
 export default function Header() {
   const [location, setLocation] = useLocation();
@@ -214,6 +215,11 @@ export default function Header() {
               </form>
             </div>
 
+            {/* Network Switcher */}
+            <div className="hidden md:block">
+              <NetworkSwitcher />
+            </div>
+
             {/* Connection Status */}
             {connectionStatus && (
               <Button
@@ -359,6 +365,9 @@ export default function Header() {
                   </nav>
 
                   <div className="mt-auto pt-4 border-t space-y-2">
+                    {/* Network Switcher in mobile menu */}
+                    <NetworkSwitcher />
+                    
                     {/* Always show wallet connect button */}
                     <WalletConnectButton className="w-full" size="sm" />
                     

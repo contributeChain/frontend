@@ -30,6 +30,8 @@ export const networkConfig = {
   environment: DEFAULT_NETWORK === "mainnet" ? mainnet : testnet,
 };
 
+// Create client configuration with dynamic environment support
+let currentEnvironment = DEFAULT_NETWORK === 'mainnet' ? mainnet : testnet;
 
 export interface ProfileAttribute {
   key: string;
@@ -127,9 +129,20 @@ function convertToLensMetadata(metadata: ProfileMetadata): any {
 
 // Initialize Lens client with environment based on configuration
 export const lensClient = PublicClient.create({
-  environment: DEFAULT_NETWORK === 'mainnet' ? mainnet : testnet,
+  environment: currentEnvironment,
   storage: window.localStorage, // Use localStorage to persist authentication
 });
+
+// Function to change environment (used when switching networks)
+export function setLensEnvironment(network: 'mainnet' | 'testnet') {
+  // Create a new client with the updated environment
+  currentEnvironment = network === 'mainnet' ? mainnet : testnet;
+  
+  // Clear existing session from storage
+  window.localStorage.removeItem('lens.session');
+  
+  console.log(`Lens client environment changed to ${network}`);
+}
 
 // Helper function to authenticate with Lens
 export async function authenticateWithLens(walletClient: any) {
