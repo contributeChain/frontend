@@ -4,10 +4,13 @@ import { uploadJson } from './groveClient';
 import { addUserToCollection as addUserToGroveCollection } from './grove-service';
 
 // GitHub OAuth configuration
-const GITHUB_CLIENT_ID = import.meta.env.VITE_GITHUB_CLIENT_ID || "Ov23liUYQ7DJ0ipEFRWm";
-const GITHUB_CLIENT_SECRET = import.meta.env.VITE_GITHUB_CLIENT_SECRET || "d4171172b8b43bd513b6c4bae65fb88a88186c41";
-const GITHUB_REDIRECT_URI = import.meta.env.VITE_GITHUB_REDIRECT_URI || "http://localhost:3000/auth/callback";
+const GITHUB_CLIENT_ID = import.meta.env.VITE_GITHUB_CLIENT_ID || "Ov23lixqQvpop8vkzG0W";
+const GITHUB_CLIENT_SECRET = import.meta.env.VITE_GITHUB_CLIENT_SECRET || "25d6196cabad1bb6b1acdb69356295fcffce450c";
+const GITHUB_REDIRECT_URI = import.meta.env.VITE_GITHUB_REDIRECT_URI || "http://n80kw0kw000gw08gok44ogkc.34.67.137.207.sslip.io/auth/callback";
 
+console.log('GITHUB_CLIENT_ID', GITHUB_CLIENT_ID);
+console.log('GITHUB_CLIENT_SECRET', GITHUB_CLIENT_SECRET);
+console.log('GITHUB_REDIRECT_URI', GITHUB_REDIRECT_URI);
 // Combined user profile type
 export interface UserProfile {
   walletAddress: string;
