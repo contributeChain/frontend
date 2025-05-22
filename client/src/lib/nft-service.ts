@@ -223,7 +223,7 @@ export function generateNftImageUrl(
   const encodedColor = encodeURIComponent(rarity.color.replace('#', ''));
   
   // Use our own SVG image generator
-  return `/api/nft-image/generate?repo=${encodedRepo}&contributor=${encodedContributor}&score=${encodedScore}&rarity=${encodedRarity}&color=${encodedColor}`;
+  return  `http://n80kw0kw000gw08gok44ogkc.34.67.137.207.sslip.io/api/nft-image/generate?repo=${encodedRepo}&contributor=${encodedContributor}&score=${encodedScore}&rarity=${encodedRarity}&color=${encodedColor}`;
 }
 
 /**
