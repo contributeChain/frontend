@@ -1,12 +1,18 @@
 import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
-import { fetchTrendingDevelopers } from "@/lib/grove-service";
-import type { User } from "@/lib/grove-service";
+import { fetchTrendingDevelopers, getUserByWalletAddress, addUserFollowActivity, User } from "@/lib/grove-service";
+import { useToast } from "@/hooks/use-toast";
+import { useAccount } from "wagmi";
+import { getCurrentWalletAddress } from "@/lib/web3-utils";
 
 export default function TrendingDevelopers() {
   const [developers, setDevelopers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [followingStates, setFollowingStates] = useState<{[key: number]: boolean}>({});
+  const [processingStates, setProcessingStates] = useState<{[key: number]: boolean}>({});
+  const { toast } = useToast();
+  const { address, isConnected } = useAccount();
   
   useEffect(() => {
     const loadDevelopers = async () => {
@@ -14,7 +20,7 @@ export default function TrendingDevelopers() {
       
       try {
         // Get trending developers from Grove storage
-        const trendingDevs = await fetchTrendingDevelopers(5);
+        const trendingDevs = await fetchTrendingDevelopers(10);
         setDevelopers(trendingDevs);
       } catch (error) {
         console.error("Error fetching trending developers from Grove:", error);
@@ -27,6 +33,68 @@ export default function TrendingDevelopers() {
     
     loadDevelopers();
   }, []);
+
+  // Handle follow button click
+  const handleFollow = async (developer: User) => {
+    if (!isConnected || !address) {
+      toast({
+        title: "Authentication Required",
+        description: "Please connect your wallet to follow developers",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Set processing state for this specific developer
+    setProcessingStates(prev => ({ ...prev, [developer.id]: true }));
+    
+    try {
+      // Get user data for the current wallet address
+      const followerUser = await getUserByWalletAddress(address);
+      
+      if (!followerUser) {
+        toast({
+          title: "Error",
+          description: "Your profile not found. Please create a profile first.",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      // Add user follow activity
+      const success = await addUserFollowActivity(
+        developer, // followed user
+        followerUser, // follower user
+        address as `0x${string}` // wallet address
+      );
+      
+      if (success) {
+        // Update following state for this specific developer
+        setFollowingStates(prev => ({ ...prev, [developer.id]: true }));
+        
+        toast({
+          title: "Success",
+          description: `You are now following ${developer.username}`
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to follow developer. Please try again.",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error("Error following developer:", error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      // Clear processing state
+      setProcessingStates(prev => ({ ...prev, [developer.id]: false }));
+    }
+  };
   
   if (loading) {
     return (
@@ -82,10 +150,24 @@ export default function TrendingDevelopers() {
                 </div>
               </div>
               <Button 
-                className="text-xs px-2 py-1 rounded-full bg-primary/10 text-primary hover:bg-primary/20"
-                variant="ghost"
+                className={`text-xs px-2 py-1 rounded-full ${
+                  followingStates[developer.id] 
+                    ? 'bg-primary text-white hover:bg-primary/90' 
+                    : 'bg-primary/10 text-primary hover:bg-primary/20'
+                }`}
+                variant={followingStates[developer.id] ? "default" : "ghost"}
+                onClick={() => handleFollow(developer)}
+                disabled={processingStates[developer.id] || followingStates[developer.id]}
               >
-                Follow
+                {processingStates[developer.id] ? (
+                  <i className="fas fa-spinner fa-spin mr-1"></i>
+                ) : followingStates[developer.id] ? (
+                  <>
+                    <i className="fas fa-check mr-1"></i> Following
+                  </>
+                ) : (
+                  "Follow"
+                )}
               </Button>
             </div>
           ))}

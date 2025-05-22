@@ -34,10 +34,10 @@ export default function Footer() {
           <div>
             <h3 className="font-display font-bold text-lg mb-4">Product</h3>
             <ul className="space-y-2">
-              <li><Link href="/explore"><a className="text-gray-600 dark:text-gray-400 hover:text-primary">Features</a></Link></li>
-              <li><Link href="/explore"><a className="text-gray-600 dark:text-gray-400 hover:text-primary">Developers</a></Link></li>
-              <li><Link href="/repositories"><a className="text-gray-600 dark:text-gray-400 hover:text-primary">Repositories</a></Link></li>
-              <li><Link href="/explore"><a className="text-gray-600 dark:text-gray-400 hover:text-primary">NFT Gallery</a></Link></li>
+              <li><Link href="/explore" className="text-gray-600 dark:text-gray-400 hover:text-primary">Features</Link></li>
+              <li><Link href="/explore" className="text-gray-600 dark:text-gray-400 hover:text-primary">Developers</Link></li>
+              <li><Link href="/repositories" className="text-gray-600 dark:text-gray-400 hover:text-primary">Repositories</Link></li>
+              <li><Link href="/explore" className="text-gray-600 dark:text-gray-400 hover:text-primary">NFT Gallery</Link></li>
               <li><a href="#" className="text-gray-600 dark:text-gray-400 hover:text-primary">Pricing</a></li>
             </ul>
           </div>

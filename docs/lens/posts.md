@@ -70,16 +70,16 @@ This example uses Grove storage to host the Metadata object. See the Lens Metada
 
 ### 3. Create Post
 
-Next, create the post using the `createPost` action.
+Next, create the post using the `post` action.
 
 ```ts
-import { uri } from "@lens-protocol/client";
-import { createPost } from "@lens-protocol/client/actions";
+import { uri } from "protocol/client";
+import { post } from "protocol/client/actions";
 
 // …
 
-const result = await createPost(sessionClient, {
-  metadataUri: uri("lens://4f91…"), // the URI from the previous step
+const result = await post(sessionClient, {
+  contentUri: uri("lens://4f91…"), // the URI from the previous step
 });
 ```
 
@@ -92,8 +92,8 @@ import { handleOperationWith } from "@lens-protocol/client/viem";
 
 // …
 
-const result = await createPost(sessionClient, {
-  metadataUri: uri("lens://4f91…"), // the URI from the previous step
+const result = await post(sessionClient, {
+  contentUri: uri("lens://4f91…"), // the URI from the previous step
 })
   .andThen(handleOperationWith(walletClient))
   .andThen(sessionClient.waitForTransaction);
@@ -106,12 +106,12 @@ See the Transaction Lifecycle guide for more information on how to determine the
 Finally, fetch the newly created post using the `fetchPost` action.
 
 ```ts
-import { fetchPost } from "@lens-protocol/client/actions";
+import { fetchPost } from "protocol/client/actions";
 
 // …
 
-const result = await createPost(sessionClient, {
-  metadataUri: uri("lens://4f91…"), // the URI from the previous step
+const result = await post(sessionClient, {
+  contentUri: uri("lens://4f91…"), // the URI from the previous step
 })
   .andThen(handleOperationWith(walletClientOrSigner))
   .andThen(sessionClient.waitForTransaction)
@@ -136,26 +136,71 @@ Lens Post data has a rich structure that includes the following information:
 - Post ID
 - Post Metadata content
 - Creator information
-- Creation time
-- Engagement metrics (comments, mirrors, reactions)
+- Timestamp
+- App information 
+- Root, quote, and comment references
+- Engagement metrics (bookmarks, comments, reposts, quotes, reactions)
 
 To illustrate how to fetch posts, we will use the following fragments:
 
 ```graphql
 fragment Post on Post {
   id
+  author {
+    ...Account
+  }
+  timestamp
+  app {
+    address
+    metadata {
+      name
+      logo
+    }
+  }
   metadata {
     ...PostMetadata
   }
-  by {
-    ...Account
+  root {
+    ...ReferencedPost
+  }
+  quoteOf {
+    ...ReferencedPost
+  }
+  commentOn {
+    ...ReferencedPost
   }
   stats {
-    comments
-    mirrors
-    reactions
+    ...PostStats
   }
-  createdAt
+}
+
+fragment Account on Account {
+  address
+  username
+  metadata {
+    name
+    picture
+  }
+}
+
+fragment PostStats on PostStats {
+  # The total number of bookmarks.
+  bookmarks
+
+  # The total number of comments.
+  comments
+
+  # The total number of reposts.
+  reposts
+
+  # The total number of quotes.
+  quotes
+
+  # The total number of upvotes.
+  upvotes: reactions(request: { type: UPVOTE })
+
+  # The total number of downvotes.
+  downvotes: reactions(request: { type: DOWNVOTE })
 }
 ```
 
@@ -165,13 +210,13 @@ Use the `fetchPost` action to fetch a single post by ID or by transaction hash.
 
 ```ts
 // By ID
-import { postId } from "@lens-protocol/client";
-import { fetchPost } from "@lens-protocol/client/actions";
+import { postId } from "protocol/client";
+import { fetchPost } from "protocol/client/actions";
 
 import { client } from "./client";
 
 const result = await fetchPost(client, {
-  post: postId("0x01-0x01"),
+  post: postId("01234…"),
 });
 
 if (result.isErr()) {
@@ -187,8 +232,8 @@ Use the paginated `fetchPosts` action to fetch a list of posts based on the prov
 
 ```ts
 // By Creator
-import { evmAddress } from "@lens-protocol/client";
-import { fetchPosts } from "@lens-protocol/client/actions";
+import { evmAddress } from "protocol/client";
+import { fetchPosts } from "protocol/client/actions";
 
 import { client } from "./client";
 
@@ -206,6 +251,94 @@ if (result.isErr()) {
 const { items, pageInfo } = result.value;
 ```
 
+### List Posts by Search Query
+
+Use the search query filter to find posts by text content.
+
+```ts
+import { evmAddress } from "protocol/client";
+import { fetchPosts } from "protocol/client/actions";
+
+import { client } from "./client";
+
+const result = await fetchPosts(client, {
+  filter: {
+    searchQuery: "Hello, World!",
+  },
+});
+
+if (result.isErr()) {
+  return console.error(result.error);
+}
+
+// items: Array<AnyPost>
+const { items, pageInfo } = result.value;
+```
+
+### List Posts by Feeds
+
+Use the feeds filter to fetch posts from global or custom feeds.
+
+```ts
+import { evmAddress } from "protocol/client";
+import { fetchPosts } from "protocol/client/actions";
+
+import { client } from "./client";
+
+const result = await fetchPosts(client, {
+  filter: {
+    feeds: [
+      // filter by the global feed
+      {
+        globalFeed: true,
+      },
+
+      // filter by a specific feed address
+      // {
+      //   feed: evmAddress("0x5678…"),
+      // },
+
+      // filter by ALL feeds associated with an app address
+      // {
+      //   app: evmAddress("0x9123…"),
+      // }
+    ],
+  },
+});
+
+if (result.isErr()) {
+  return console.error(result.error);
+}
+
+// items: Array<AnyPost>
+const { items, pageInfo } = result.value;
+```
+
+### List Posts by Apps
+
+Use the apps filter to fetch posts created through specific applications.
+
+```ts
+import { evmAddress } from "protocol/client";
+import { fetchPosts } from "protocol/client/actions";
+
+import { client } from "./client";
+
+const result = await fetchPosts(client, {
+  filter: {
+    // apps used to publish the posts
+    apps: [evmAddress("0x1234…"), evmAddress("0x5678…")]
+  },
+});
+
+if (result.isErr()) {
+  return console.error(result.error);
+}
+
+// items: Array<AnyPost>
+const { items, pageInfo } = result.value;
+```
+
 See the Pagination guide for more information on how to handle paginated results.
 
 ### List Comments
@@ -213,8 +346,8 @@ See the Pagination guide for more information on how to handle paginated results
 Use the paginated `fetchComments` action to fetch a list of comments for a post.
 
 ```ts
-import { postId } from "@lens-protocol/client";
-import { fetchComments } from "@lens-protocol/client/actions";
+import { postId } from "protocol/client";
+import { fetchComments } from "protocol/client/actions";
 
 import { client } from "./client";
 
@@ -237,8 +370,8 @@ See the Pagination guide for more information on how to handle paginated results
 Use the paginated `fetchMirrors` action to fetch a list of mirrors for a post.
 
 ```ts
-import { postId } from "@lens-protocol/client";
-import { fetchMirrors } from "@lens-protocol/client/actions";
+import { postId } from "protocol/client";
+import { fetchMirrors } from "protocol/client/actions";
 
 import { client } from "./client";
 
@@ -261,8 +394,8 @@ See the Pagination guide for more information on how to handle paginated results
 Use the paginated `fetchReactions` action to fetch a list of reactions for a post.
 
 ```ts
-import { postId } from "@lens-protocol/client";
-import { fetchReactions } from "@lens-protocol/client/actions";
+import { postId } from "protocol/client";
+import { fetchReactions } from "protocol/client/actions";
 
 import { client } from "./client";
 
@@ -286,9 +419,40 @@ To create a comment on a post, follow these steps.
 
 You MUST be authenticated as Account Owner or Account Manager to create a comment.
 
-### 1. Create Comment Metadata
+### 1. Check Parent Rules
 
-First, construct a Comment Metadata object with the necessary content.
+First, inspect the `post.operations.canComment` field to determine whether the logged-in Account is allowed to comment on a given post. Some posts may have restrictions on who can comment on them.
+
+Comments cannot have their own Post Rules. Instead, they inherit the rules of the root post (either a Post or a Quote) in the thread. The operations field of a comment reflects the rules of the root post.
+
+```ts
+switch (post.operations.canComment.__typename) {
+  case "PostOperationValidationPassed":
+    // Commenting is allowed
+    break;
+
+  case "PostOperationValidationFailed":
+    // Commenting is not allowed
+    console.log(post.operations.canComment.reason);
+    break;
+
+  case "PostOperationValidationUnknown":
+    // Validation outcome is unknown
+    break;
+}
+```
+
+Where:
+
+- `PostOperationValidationPassed`: The logged-in Account can comment on the Post.
+- `PostOperationValidationFailed`: Commenting is not allowed. The `reason` field explains why, and `unsatisfiedRules` lists the unmet requirements.
+- `PostOperationValidationUnknown`: The Post or its Feed (for custom Feeds) has one or more unknown rules requiring ad-hoc verification. The `extraChecksRequired` field provides the addresses and configurations of these rules.
+
+Treat the `PostOperationValidationUnknown` as failed unless you intend to support the specific rules. See Post Rules for more information.
+
+### 2. Create Comment Metadata
+
+Next, construct a Comment Metadata object with the necessary content.
 
 ```ts
 import { textOnly } from "@lens-protocol/metadata";
@@ -298,7 +462,7 @@ const metadata = textOnly({
 });
 ```
 
-### 2. Upload Comment Metadata
+### 3. Upload Comment Metadata
 
 Next, upload the Comment Metadata object to a public URI.
 
@@ -312,23 +476,25 @@ console.log(uri); // e.g., lens://4f91ca…
 
 This example uses Grove storage to host the Metadata object. See the Lens Metadata Standards guide for more information on hosting Metadata objects.
 
-### 3. Create Comment
+### 4. Create Comment
 
-Next, create the comment using the `createComment` action.
+Next, create the comment using the `post` action with the `commentOn` parameter.
 
 ```ts
-import { uri, postId } from "@lens-protocol/client";
-import { createComment } from "@lens-protocol/client/actions";
+import { postId, uri } from "protocol/client";
+import { post } from "protocol/client/actions";
 
-// …
-
-const result = await createComment(sessionClient, {
-  commentOn: postId("0x01-0x01"), // the post to comment on
-  metadataUri: uri("lens://4f91…"), // the URI from the previous step
+const result = await post(sessionClient, {
+  contentUri: uri("lens://4f91ca…"),
+  commentOn: {
+    post: postId("42"), // the post to comment on
+  },
 });
 ```
 
-### 4. Handle Result
+Cross-feed commenting is currently not supported. If you find this feature valuable, please let us know by opening an issue.
+
+### 5. Handle Result
 
 Next, handle the result using the adapter for the library of your choice and wait for it to be indexed.
 
@@ -337,9 +503,11 @@ import { handleOperationWith } from "@lens-protocol/client/viem";
 
 // …
 
-const result = await createComment(sessionClient, {
-  commentOn: postId("0x01-0x01"), // the post to comment on
-  metadataUri: uri("lens://4f91…"), // the URI from the previous step
+const result = await post(sessionClient, {
+  contentUri: uri("lens://4f91ca…"),
+  commentOn: {
+    post: postId("42"), // the post to comment on
+  },
 })
   .andThen(handleOperationWith(walletClient))
   .andThen(sessionClient.waitForTransaction);
@@ -347,7 +515,7 @@ const result = await createComment(sessionClient, {
 
 See the Transaction Lifecycle guide for more information on how to determine the status of the transaction.
 
-### 5. Fetch New Comment
+### 6. Fetch New Comment
 
 Finally, fetch the newly created comment using the `fetchComment` action.
 
@@ -356,9 +524,11 @@ import { fetchComment } from "@lens-protocol/client/actions";
 
 // …
 
-const result = await createComment(sessionClient, {
-  commentOn: postId("0x01-0x01"), // the post to comment on
-  metadataUri: uri("lens://4f91…"), // the URI from the previous step
+const result = await post(sessionClient, {
+  contentUri: uri("lens://4f91ca…"),
+  commentOn: {
+    post: postId("42"), // the post to comment on
+  },
 })
   .andThen(handleOperationWith(walletClientOrSigner))
   .andThen(sessionClient.waitForTransaction)
@@ -380,22 +550,53 @@ To create a mirror of a post, follow these steps.
 
 You MUST be authenticated as Account Owner or Account Manager to create a mirror.
 
-### 1. Create Mirror
+### 1. Check Post Rules
 
-Create the mirror using the `createMirror` action.
+First, inspect the `post.operations.canQuote` field to determine whether the logged-in Account is allowed to mirror a given Post. Some posts may have restrictions on who can mirror them.
 
 ```ts
-import { postId } from "@lens-protocol/client";
-import { createMirror } from "@lens-protocol/client/actions";
+switch (post.operations.canMirror.__typename) {
+  case "PostOperationValidationPassed":
+    // Mirroring is allowed
+    break;
 
-// …
+  case "PostOperationValidationFailed":
+    // Mirroring is not allowed
+    console.log(post.operations.canMirror.reason);
+    break;
 
-const result = await createMirror(sessionClient, {
-  mirrorOn: postId("0x01-0x01"), // the post to mirror
+  case "PostOperationValidationUnknown":
+    // Validation outcome is unknown
+    break;
+}
+```
+
+Where:
+
+- `PostOperationValidationPassed`: The logged-in Account can mirror the Post.
+- `PostOperationValidationFailed`: Mirroring is not allowed. The `reason` field explains why, and `unsatisfiedRules` lists the unmet requirements.
+- `PostOperationValidationUnknown`: The Post or its Feed (for custom Feeds) has one or more unknown rules requiring ad-hoc verification. The `extraChecksRequired` field provides the addresses and configurations of these rules.
+
+Treat the `PostOperationValidationUnknown` as failed unless you intend to support the specific rules. See Post Rules for more information.
+
+### 2. Create Mirror
+
+Next, create the mirror using the `post` action with the `mirrorOn` parameter.
+
+```ts
+import { postId, uri } from "protocol/client";
+import { post } from "protocol/client/actions";
+
+const result = await post(sessionClient, {
+  mirrorOn: {
+    post: postId("42"), // the post to mirror
+  },
 });
 ```
 
-### 2. Handle Result
+Cross-feed mirroring is currently not supported. If you find this feature valuable, please let us know by opening an issue.
+
+### 3. Handle Result
 
 Next, handle the result using the adapter for the library of your choice and wait for it to be indexed.
 
@@ -404,8 +605,10 @@ import { handleOperationWith } from "@lens-protocol/client/viem";
 
 // …
 
-const result = await createMirror(sessionClient, {
-  mirrorOn: postId("0x01-0x01"), // the post to mirror
+const result = await post(sessionClient, {
+  mirrorOn: {
+    post: postId("42"), // the post to mirror
+  },
 })
   .andThen(handleOperationWith(walletClient))
   .andThen(sessionClient.waitForTransaction);
@@ -413,7 +616,7 @@ const result = await createMirror(sessionClient, {
 
 See the Transaction Lifecycle guide for more information on how to determine the status of the transaction.
 
-### 3. Fetch New Mirror
+### 4. Fetch New Mirror
 
 Finally, fetch the newly created mirror using the `fetchMirror` action.
 
@@ -422,8 +625,10 @@ import { fetchMirror } from "@lens-protocol/client/actions";
 
 // …
 
-const result = await createMirror(sessionClient, {
-  mirrorOn: postId("0x01-0x01"), // the post to mirror
+const result = await post(sessionClient, {
+  mirrorOn: {
+    post: postId("42"), // the post to mirror
+  },
 })
   .andThen(handleOperationWith(walletClientOrSigner))
   .andThen(sessionClient.waitForTransaction)
@@ -445,7 +650,36 @@ To create a quote of a post, follow these steps.
 
 You MUST be authenticated as Account Owner or Account Manager to create a quote.
 
-### 1. Create Quote Metadata
+### 1. Check Post Rules
+
+First, inspect the `post.operations.canQuote` field to determine whether the logged-in Account is allowed to quote a given Post. Some posts may have restrictions on who can quote them.
+
+```ts
+switch (post.operations.canQuote.__typename) {
+  case "PostOperationValidationPassed":
+    // Quoting is allowed
+    break;
+
+  case "PostOperationValidationFailed":
+    // Quoting is not allowed
+    console.log(post.operations.canQuote.reason);
+    break;
+
+  case "PostOperationValidationUnknown":
+    // Validation outcome is unknown
+    break;
+}
+```
+
+Where:
+
+- `PostOperationValidationPassed`: The logged-in Account can quote the Post.
+- `PostOperationValidationFailed`: Quoting is not allowed. The `reason` field explains why, and `unsatisfiedRules` lists the unmet requirements.
+- `PostOperationValidationUnknown`: The Post or its Feed (for custom Feeds) has one or more unknown rules requiring ad-hoc verification. The `extraChecksRequired` field provides the addresses and configurations of these rules.
+
+Treat the `PostOperationValidationUnknown` as failed unless you intend to support the specific rules. See Post Rules for more information.
+
+### 2. Create Quote Metadata
 
 First, construct a Quote Metadata object with the necessary content.
 
@@ -457,7 +691,7 @@ const metadata = textOnly({
 });
 ```
 
-### 2. Upload Quote Metadata
+### 3. Upload Quote Metadata
 
 Next, upload the Quote Metadata object to a public URI.
 
@@ -471,23 +705,27 @@ console.log(uri); // e.g., lens://4f91ca…
 
 This example uses Grove storage to host the Metadata object. See the Lens Metadata Standards guide for more information on hosting Metadata objects.
 
-### 3. Create Quote
+### 4. Create Quote
 
-Next, create the quote using the `createQuote` action.
+Next, create the quote using the `post` action with the `quoteOf` parameter.
 
 ```ts
-import { uri, postId } from "@lens-protocol/client";
-import { createQuote } from "@lens-protocol/client/actions";
+import { uri, postId } from "protocol/client";
+import { post } from "protocol/client/actions";
 
 // …
 
-const result = await createQuote(sessionClient, {
-  quoteOn: postId("0x01-0x01"), // the post to quote
-  metadataUri: uri("lens://4f91…"), // the URI from the previous step
+const result = await post(sessionClient, {
+  contentUri: uri("lens://4f91…"), // the URI from the previous step
+  quoteOf: {
+    post: postId("42"), // the post to quote
+  },
 });
 ```
 
-### 4. Handle Result
+Cross-feed quoting is currently not supported. If you find this feature valuable, please let us know by opening an issue.
+
+### 5. Handle Result
 
 Next, handle the result using the adapter for the library of your choice and wait for it to be indexed.
 
@@ -496,9 +734,11 @@ import { handleOperationWith } from "@lens-protocol/client/viem";
 
 // …
 
-const result = await createQuote(sessionClient, {
-  quoteOn: postId("0x01-0x01"), // the post to quote
-  metadataUri: uri("lens://4f91…"), // the URI from the previous step
+const result = await post(sessionClient, {
+  contentUri: uri("lens://4f91…"), // the URI from the previous step
+  quoteOf: {
+    post: postId("42"), // the post to quote
+  }
 })
   .andThen(handleOperationWith(walletClient))
   .andThen(sessionClient.waitForTransaction);
@@ -506,7 +746,7 @@ const result = await createQuote(sessionClient, {
 
 See the Transaction Lifecycle guide for more information on how to determine the status of the transaction.
 
-### 5. Fetch New Quote
+### 6. Fetch New Quote
 
 Finally, fetch the newly created quote using the `fetchQuote` action.
 
@@ -515,9 +755,11 @@ import { fetchQuote } from "@lens-protocol/client/actions";
 
 // …
 
-const result = await createQuote(sessionClient, {
-  quoteOn: postId("0x01-0x01"), // the post to quote
-  metadataUri: uri("lens://4f91…"), // the URI from the previous step
+const result = await post(sessionClient, {
+  contentUri: uri("lens://4f91…"), // the URI from the previous step
+  quoteOf: {
+    post: postId("42"), // the post to quote
+  }
 })
   .andThen(handleOperationWith(walletClientOrSigner))
   .andThen(sessionClient.waitForTransaction)
@@ -533,6 +775,25 @@ const quote = result.value;
 
 That's it—you now have a quote of a post!
 
+## Post on Custom Feed
+
+You can also post directly to a custom feed if allowed.
+
+```ts
+import { evmAddress, postId, uri } from "protocol/client";
+import { post } from "protocol/client/actions";
+
+const result = await post(sessionClient, {
+  contentUri: uri("lens://4f91ca…"),
+  commentOn: {
+    post: postId("42"), // the post to comment on
+  },
+  feed: evmAddress("0x1234…"), // the custom feed address
+});
+```
+
+Continue as you would with a regular Post on the Global Feed.
+
 ## Create a Reaction
 
 To create a reaction to a post, follow these steps.
@@ -544,8 +805,8 @@ You MUST be authenticated as Account Owner or Account Manager to create a reacti
 Create the reaction using the `addReaction` action.
 
 ```ts
-import { postId, ReactionType } from "@lens-protocol/client";
-import { addReaction } from "@lens-protocol/client/actions";
+import { postId, ReactionType } from "protocol/client";
+import { addReaction } from "protocol/client/actions";
 
 // …
 
@@ -564,8 +825,8 @@ if (result.isErr()) {
 To remove a reaction, use the `removeReaction` action.
 
 ```ts
-import { postId, ReactionType } from "@lens-protocol/client";
-import { removeReaction } from "@lens-protocol/client/actions";
+import { postId, ReactionType } from "protocol/client";
+import { removeReaction } from "protocol/client/actions";
 
 // …
 
@@ -590,8 +851,8 @@ You MUST be authenticated as Account Owner or Account Manager to hide a post.
 Hide the post using the `hidePost` action.
 
 ```ts
-import { postId } from "@lens-protocol/client";
-import { hidePost } from "@lens-protocol/client/actions";
+import { postId } from "protocol/client";
+import { hidePost } from "protocol/client/actions";
 
 // …
 
@@ -609,8 +870,8 @@ if (result.isErr()) {
 To unhide a post, use the `unhidePost` action.
 
 ```ts
-import { postId } from "@lens-protocol/client";
-import { unhidePost } from "@lens-protocol/client/actions";
+import { postId } from "protocol/client";
+import { unhidePost } from "protocol/client/actions";
 
 // …
 
@@ -632,8 +893,8 @@ To report a post, follow these steps.
 Report the post using the `reportPost` action.
 
 ```ts
-import { postId, ReportReason } from "@lens-protocol/client";
-import { reportPost } from "@lens-protocol/client/actions";
+import { postId, ReportReason } from "protocol/client";
+import { reportPost } from "protocol/client/actions";
 
 // …
 
@@ -659,8 +920,8 @@ You MUST be authenticated to bookmark a post.
 Add the post to bookmarks using the `addBookmark` action.
 
 ```ts
-import { postId } from "@lens-protocol/client";
-import { addBookmark } from "@lens-protocol/client/actions";
+import { postId } from "protocol/client";
+import { addBookmark } from "protocol/client/actions";
 
 // …
 
@@ -678,8 +939,8 @@ if (result.isErr()) {
 To remove a post from bookmarks, use the `removeBookmark` action.
 
 ```ts
-import { postId } from "@lens-protocol/client";
-import { removeBookmark } from "@lens-protocol/client/actions";
+import { postId } from "protocol/client";
+import { removeBookmark } from "protocol/client/actions";
 
 // …
 
@@ -697,7 +958,7 @@ if (result.isErr()) {
 Use the paginated `fetchBookmarks` action to fetch a list of bookmarked posts.
 
 ```ts
-import { fetchBookmarks } from "@lens-protocol/client/actions";
+import { fetchBookmarks } from "protocol/client/actions";
 
 // …
 
@@ -720,7 +981,7 @@ Lens supports a variety of post metadata types to enable rich content experience
 ### Text-Only Post
 
 ```ts
-import { textOnly } from "@lens-protocol/metadata";
+import { textOnly } from "protocol/metadata";
 
 const metadata = textOnly({
   content: "Hello World!",
@@ -730,7 +991,7 @@ const metadata = textOnly({
 ### Image Post
 
 ```ts
-import { image } from "@lens-protocol/metadata";
+import { image } from "protocol/metadata";
 
 const metadata = image({
   image: "ipfs://QmV5dYTm8LLmHEGLGEQDGvjq4jeoHjKgQWXgTQNKQgVFK1",
@@ -742,7 +1003,7 @@ const metadata = image({
 ### Video Post
 
 ```ts
-import { video } from "@lens-protocol/metadata";
+import { video } from "protocol/metadata";
 
 const metadata = video({
   video: "ipfs://QmV5dYTm8LLmHEGLGEQDGvjq4jeoHjKgQWXgTQNKQgVFK1",
@@ -754,7 +1015,7 @@ const metadata = video({
 ### Article Post
 
 ```ts
-import { article } from "@lens-protocol/metadata";
+import { article } from "protocol/metadata";
 
 const metadata = article({
   title: "My Article",
@@ -771,7 +1032,7 @@ const metadata = article({
 ### Audio Post
 
 ```ts
-import { audio } from "@lens-protocol/metadata";
+import { audio } from "protocol/metadata";
 
 const metadata = audio({
   audio: "ipfs://QmV5dYTm8LLmHEGLGEQDGvjq4jeoHjKgQWXgTQNKQgVFK1",
@@ -783,7 +1044,7 @@ const metadata = audio({
 ### Embed Post
 
 ```ts
-import { embed } from "@lens-protocol/metadata";
+import { embed } from "protocol/metadata";
 
 const metadata = embed({
   embed: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
@@ -795,7 +1056,7 @@ const metadata = embed({
 ### Link Post
 
 ```ts
-import { link } from "@lens-protocol/metadata";
+import { link } from "protocol/metadata";
 
 const metadata = link({
   url: "https://example.com",
@@ -807,7 +1068,7 @@ const metadata = link({
 ### Mint Post
 
 ```ts
-import { mint } from "@lens-protocol/metadata";
+import { mint } from "protocol/metadata";
 
 const metadata = mint({
   mintLink: "https://opensea.io/assets/ethereum/0x1234…/1",
@@ -819,7 +1080,7 @@ const metadata = mint({
 ### Transaction Post
 
 ```ts
-import { transaction } from "@lens-protocol/metadata";
+import { transaction } from "protocol/metadata";
 
 const metadata = transaction({
   txHash: "0x1234…",
@@ -831,7 +1092,7 @@ const metadata = transaction({
 ### Space Post
 
 ```ts
-import { space } from "@lens-protocol/metadata";
+import { space } from "protocol/metadata";
 
 const metadata = space({
   spaceId: "1234",
@@ -843,7 +1104,7 @@ const metadata = space({
 ### 3D Post
 
 ```ts
-import { threeD } from "@lens-protocol/metadata";
+import { threeD } from "protocol/metadata";
 
 const metadata = threeD({
   uri: "ipfs://QmV5dYTm8LLmHEGLGEQDGvjq4jeoHjKgQWXgTQNKQgVFK1",

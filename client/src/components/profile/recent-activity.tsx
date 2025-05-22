@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
-import { User } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { formatTimeAgo } from "@/lib/utils";
 import { Link } from "wouter";
 import { getActivitiesByUserId } from "@/lib/grove-service";
-import type { Activity } from "@/lib/grove-service";
+import type { Activity, User } from "@/lib/grove-service";
+import { Button } from "@/components/ui/button";
 
 interface RecentActivityProps {
   user: User;
@@ -14,6 +14,10 @@ export default function RecentActivity({ user }: RecentActivityProps) {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const activitiesPerPage = 5;
   
   useEffect(() => {
     const fetchActivities = async () => {
@@ -40,6 +44,49 @@ export default function RecentActivity({ user }: RecentActivityProps) {
     
     fetchActivities();
   }, [user, toast]);
+  
+  // Get current activities for pagination
+  const indexOfLastActivity = currentPage * activitiesPerPage;
+  const indexOfFirstActivity = indexOfLastActivity - activitiesPerPage;
+  const currentActivities = activities.slice(indexOfFirstActivity, indexOfLastActivity);
+  const totalPages = Math.ceil(activities.length / activitiesPerPage);
+  
+  // Pagination component
+  const Pagination = () => {
+    if (totalPages <= 1) return null;
+    
+    return (
+      <div className="flex justify-center items-center mt-6 gap-2">
+        <Button 
+          variant="outline" 
+          size="icon"
+          disabled={currentPage === 1}
+          onClick={() => setCurrentPage(currentPage - 1)}
+          className="h-8 w-8"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="15 18 9 12 15 6"></polyline>
+          </svg>
+        </Button>
+        
+        <div className="flex items-center text-sm">
+          Page {currentPage} of {totalPages}
+        </div>
+        
+        <Button 
+          variant="outline" 
+          size="icon"
+          disabled={currentPage === totalPages}
+          onClick={() => setCurrentPage(currentPage + 1)}
+          className="h-8 w-8"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
+        </Button>
+      </div>
+    );
+  };
   
   if (loading) {
     return (
@@ -99,7 +146,7 @@ export default function RecentActivity({ user }: RecentActivityProps) {
     <>
       <h4 className="font-display font-bold text-lg mb-4">Recent Activity</h4>
       <div className="space-y-3">
-        {activities.map((activityItem) => (
+        {currentActivities.map((activityItem) => (
           <div key={activityItem.activity.id} className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 flex gap-3 items-start">
             <div className={`w-8 h-8 ${getIconClass(activityItem.activity.type)} rounded-full flex items-center justify-center flex-shrink-0`}>
               <i className={`fas ${getActivityIcon(activityItem.activity.type)} text-sm`}></i>
@@ -108,7 +155,7 @@ export default function RecentActivity({ user }: RecentActivityProps) {
               <div className="flex justify-between items-start">
                 <div className="font-medium">
                   {activityItem.activity.repoName && (
-                    <>Activity in <Link href={`/repositories/${activityItem.activity.repoName}`}><a className="text-primary">{activityItem.activity.repoName}</a></Link></>
+                    <>Activity in <Link href={`/repositories/${activityItem.activity.repoName}`} className="text-primary">{activityItem.activity.repoName}</Link></>
                   )}
                   {!activityItem.activity.repoName && (
                     <>{activityItem.activity.description}</>
@@ -138,6 +185,9 @@ export default function RecentActivity({ user }: RecentActivityProps) {
           </div>
         ))}
       </div>
+      
+      {/* Pagination controls */}
+      <Pagination />
     </>
   );
 }

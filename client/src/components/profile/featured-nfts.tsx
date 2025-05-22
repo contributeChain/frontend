@@ -5,7 +5,7 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 
 interface FeaturedNFTsProps {
-  walletAddress?: string;
+  walletAddress?: string | null;
 }
 
 export default function FeaturedNFTs({ walletAddress }: FeaturedNFTsProps) {
@@ -43,7 +43,7 @@ export default function FeaturedNFTs({ walletAddress }: FeaturedNFTsProps) {
         name: "Loading...",
         description: "Please wait",
         imageUrl: "",
-        rarity: "common" as const,
+        rarity: "common",
         mintedAt: new Date(),
       }));
     }
@@ -56,7 +56,7 @@ export default function FeaturedNFTs({ walletAddress }: FeaturedNFTsProps) {
           name: "COMMIT-7834",
           description: "React Component Library",
           imageUrl: "",
-          rarity: "rare" as const,
+          rarity: "rare",
           mintedAt: new Date(2023, 4), // May 2023
         },
         {
@@ -65,7 +65,7 @@ export default function FeaturedNFTs({ walletAddress }: FeaturedNFTsProps) {
           name: "STREAK-30",
           description: "30 Day Commit Streak",
           imageUrl: "",
-          rarity: "epic" as const,
+          rarity: "epic",
           mintedAt: new Date(2023, 5), // June 2023
         },
         {
@@ -74,7 +74,7 @@ export default function FeaturedNFTs({ walletAddress }: FeaturedNFTsProps) {
           name: "PR-MERGE-42",
           description: "Major Feature Merge",
           imageUrl: "",
-          rarity: "common" as const,
+          rarity: "common",
           mintedAt: new Date(2023, 6), // July 2023
         },
         {
@@ -83,7 +83,7 @@ export default function FeaturedNFTs({ walletAddress }: FeaturedNFTsProps) {
           name: "NEW NFT",
           description: "Keep contributing!",
           imageUrl: "",
-          rarity: "common" as const,
+          rarity: "common",
           mintedAt: new Date(),
         }
       ];

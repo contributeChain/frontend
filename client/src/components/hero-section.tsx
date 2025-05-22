@@ -1,41 +1,14 @@
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { connectGitHub } from "@/lib/github-utils";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 
 export default function HeroSection() {
   const { toast } = useToast();
-  const [isConnecting, setIsConnecting] = useState(false);
+  const [, setLocation] = useLocation();
   
-  const handleConnectGitHub = async () => {
-    setIsConnecting(true);
-    try {
-      const result = await connectGitHub();
-      
-      if (result.success) {
-        toast({
-          title: "GitHub Connected!",
-          description: `Successfully connected GitHub account: ${result.username}`,
-          variant: "default",
-        });
-      } else {
-        toast({
-          title: "Connection Failed",
-          description: "Unable to connect GitHub account. Please try again.",
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      console.error("Error connecting GitHub:", error);
-      toast({
-        title: "Connection Error",
-        description: "An error occurred while connecting to GitHub.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsConnecting(false);
-    }
+  const handleConnectGitHub = () => {
+    setLocation("/github/link");
   };
   
   return (
@@ -57,19 +30,9 @@ export default function HeroSection() {
               <Button 
                 className="bg-primary hover:bg-primary/90 text-white font-medium py-3 px-6 rounded-lg flex items-center gap-2 shadow-lg shadow-primary/20"
                 onClick={handleConnectGitHub}
-                disabled={isConnecting}
               >
-                {isConnecting ? (
-                  <>
-                    <i className="fas fa-spinner fa-spin"></i>
-                    <span>Connecting...</span>
-                  </>
-                ) : (
-                  <>
-                    <i className="fab fa-github"></i>
-                    <span>Connect GitHub</span>
-                  </>
-                )}
+                <i className="fab fa-github"></i>
+                <span>Connect GitHub</span>
               </Button>
               <Link href="/explore">
                 <Button className="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-darkText dark:text-lightText font-medium py-3 px-6 rounded-lg border border-gray-200 dark:border-gray-700 flex items-center gap-2">

@@ -1,9 +1,10 @@
-import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useCallback } from 'react';
+import { useLocation } from 'wouter';
 import { Helmet } from 'react-helmet-async';
 import { useAccount } from 'wagmi';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/providers/AuthProvider';
+import { useAuth } from '@/hooks/use-auth';
+import { useGitHubStore } from '@/store';
 import { Container } from '@/components/layout/container';
 import { GitHubProfileLink } from '@/components/github/GitHubProfileLink';
 import { GitHubProfilePreview } from '@/components/profile/GitHubProfilePreview';
@@ -11,30 +12,48 @@ import { GitHubProfilePreview } from '@/components/profile/GitHubProfilePreview'
 export default function LinkGitHubPage() {
   const { address, isConnected } = useAccount();
   const { user, isAuthenticated } = useAuth();
-  const navigate = useNavigate();
+  
+  // Use useMemo to prevent unnecessary re-renders
+  const gitHubAuth = useMemo(() => {
+    const state = useGitHubStore.getState();
+    return { 
+      isAuthenticated: state.isAuthenticated,
+      user: state.user 
+    };
+  }, []); // Empty dependency array since we only need it once on mount
+  
+  const [location, setLocation] = useLocation();
   const { toast } = useToast();
   
-  // If already authenticated with GitHub, redirect to profile
+  const handleComplete = useCallback(() => {
+    setLocation('/profile');
+  }, [setLocation]);
+  
+  // Check for GitHub connection only once on mount or when auth state changes
   useEffect(() => {
-    if (isAuthenticated && user?.githubUser) {
+    // Get current values directly from the store to avoid stale closures
+    const { isAuthenticated: gitHubIsAuthenticated, user: gitHubUser } = useGitHubStore.getState();
+    
+    // Check both auth store and GitHub store authentication state
+    const hasGitHubConnected = 
+      (isAuthenticated && user?.githubUser) || 
+      (gitHubIsAuthenticated && gitHubUser);
+    
+    if (hasGitHubConnected) {
       toast({
         title: "Already Connected",
         description: "Your GitHub account is already linked to your wallet",
       });
-      navigate('/profile');
+      setLocation('/profile');
     }
-  }, [isAuthenticated, user, navigate, toast]);
-  
-  const handleComplete = () => {
-    navigate('/profile');
-  };
+  }, [isAuthenticated, user, setLocation, toast]);
   
   return (
     <>
       <Helmet>
         <title>Link GitHub | Lens Alchemy</title>
       </Helmet>
-      <Container className="max-w-3xl py-10">
+      <Container className="max-w-4xl py-10">
         <div className="mb-8 text-center">
           <h1 className="text-3xl font-bold mb-2">Connect your GitHub Account</h1>
           <p className="text-muted-foreground">
@@ -51,11 +70,13 @@ export default function LinkGitHubPage() {
           </div>
         )}
         
-        {isConnected && user?.githubUser ? (
-          <GitHubProfilePreview onConfirm={handleComplete} />
-        ) : (
-          <GitHubProfileLink onComplete={handleComplete} />
-        )}
+        <div className="mt-8">
+          {isConnected && (user?.githubUser || gitHubAuth.user) ? (
+            <GitHubProfilePreview onConfirm={handleComplete} />
+          ) : (
+            <GitHubProfileLink onComplete={handleComplete} />
+          )}
+        </div>
       </Container>
     </>
   );

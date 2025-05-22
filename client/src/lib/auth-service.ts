@@ -1,7 +1,7 @@
 import { Octokit } from '@octokit/core';
 import { createTokenClient, getAuthenticatedUser, type GitHubUser } from './githubClient';
 import { uploadJson } from './groveClient';
-import { addUserToCollection } from './grove-service';
+import { addUserToCollection as addUserToGroveCollection } from './grove-service';
 
 // GitHub OAuth configuration
 const GITHUB_CLIENT_ID = import.meta.env.VITE_GITHUB_CLIENT_ID || "Ov23liUYQ7DJ0ipEFRWm";
@@ -70,6 +70,16 @@ export function clearLocalUserProfile(): void {
   localStorage.removeItem('user_profile');
 }
 
+// Add user to collection in Grove
+export async function addUserToCollection(userData: any, walletAddress: `0x${string}`): Promise<boolean> {
+  try {
+    return await addUserToGroveCollection(userData, walletAddress);
+  } catch (error) {
+    console.error('Failed to add user to collection:', error);
+    return false;
+  }
+}
+
 // Link wallet with GitHub account (using token)
 export async function linkWalletWithGitHubToken(
   walletAddress: string,
@@ -93,6 +103,32 @@ export async function linkWalletWithGitHubToken(
     
     // Store profile locally
     storeLocalUserProfile(profile);
+    
+    // Store in Grove if it's an Ethereum address
+    if (walletAddress.startsWith('0x') && walletAddress.length === 42) {
+      try {
+        // Store individual user profile
+        await storeUserProfile(profile, walletAddress as `0x${string}`);
+        
+        // Add user to the users collection
+        const userData = {
+          id: Date.now(),
+          username: githubUser.login,
+          githubUsername: githubUser.login,
+          avatarUrl: githubUser.avatar_url,
+          reputation: 0,
+          walletAddress: walletAddress,
+          bio: githubUser.bio || null,
+          location: githubUser.location || null,
+          website: githubUser.blog || githubUser.html_url || null,
+          createdAt: new Date()
+        };
+        
+        await addUserToCollection(userData, walletAddress as `0x${string}`);
+      } catch (error) {
+        console.warn('Failed to store in Grove, but continuing with local storage:', error);
+      }
+    }
     
     return profile;
   } catch (error) {

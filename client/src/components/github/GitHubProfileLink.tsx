@@ -1,145 +1,154 @@
 import { useState } from 'react';
-import { useAccount } from 'wagmi';
-import { useAuth } from '@/providers/AuthProvider';
 import { Button } from '@/components/ui/button';
-import { Spinner } from '@/components/ui/spinner';
+import { getGitHubAuthUrl } from '@/lib/auth-service';
+import { useConnections } from '@/hooks/use-connections';
+import { useToast } from '@/hooks/use-toast';
 import {
   Card,
   CardContent,
   CardDescription,
   CardFooter,
   CardHeader,
-  CardTitle,
+  CardTitle
 } from '@/components/ui/card';
-import { useToast } from '@/hooks/use-toast';
+import ConnectWalletButton from '@/components/ConnectWalletButton';
 
-export interface GitHubProfileLinkProps {
+interface GitHubProfileLinkProps {
   onComplete?: () => void;
-  redirectPath?: string;
 }
 
-export function GitHubProfileLink({ 
-  onComplete, 
-  redirectPath = '/profile' 
-}: GitHubProfileLinkProps) {
-  const { address, isConnected } = useAccount();
-  const { user, connectGitHub } = useAuth();
+export function GitHubProfileLink({ onComplete }: GitHubProfileLinkProps) {
+  const [isLoading, setIsLoading] = useState(false);
+  const { isConnected, isGitHubAuthenticated } = useConnections();
   const { toast } = useToast();
-  const [isProcessing, setIsProcessing] = useState(false);
-
-  const handleConnectGitHub = async () => {
-    try {
-      setIsProcessing(true);
-      connectGitHub();
-      // No need to set processing to false since we're redirecting away
-    } catch (error) {
-      setIsProcessing(false);
-      console.error('Error connecting to GitHub:', error);
+  
+  const handleGitHubConnect = () => {
+    if (!isConnected) {
       toast({
-        variant: 'destructive',
-        title: 'Connection Failed',
-        description: 'Failed to connect to GitHub. Please try again.',
+        title: "Wallet Required",
+        description: "Please connect your wallet before linking GitHub.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setIsLoading(true);
+    
+    try {
+      // Store any return path for after authentication if needed
+      localStorage.setItem('post_github_auth_redirect', window.location.pathname);
+      
+      // Redirect to GitHub OAuth authorization URL
+      const authUrl = getGitHubAuthUrl();
+      console.log("Redirecting to GitHub auth URL:", authUrl);
+      window.location.href = authUrl;
+    } catch (error) {
+      console.error('Error redirecting to GitHub auth:', error);
+      setIsLoading(false);
+      
+      toast({
+        title: "Connection Error",
+        description: "Failed to connect to GitHub. Please try again.",
+        variant: "destructive"
       });
     }
   };
 
+  // If already connected to GitHub, handle completion
+  if (isGitHubAuthenticated && onComplete) {
+    onComplete();
+  }
+  
   return (
-    <Card className="overflow-hidden">
-      <CardHeader className="bg-gradient-to-r from-blue-600 to-purple-600 text-white">
-        <CardTitle className="flex items-center gap-2">
-          <svg height="24" width="24" viewBox="0 0 16 16" className="fill-current" xmlns="http://www.w3.org/2000/svg">
-            <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.012 8.012 0 0 0 16 8c0-4.42-3.58-8-8-8z"/>
-          </svg>
-          Connect GitHub Account
-        </CardTitle>
-        <CardDescription className="text-white/80">
-          Link your GitHub account to your wallet to access all features
+    <Card className="border-2 border-dashed">
+      <CardHeader className="space-y-1">
+        <CardTitle className="text-2xl">Link your GitHub Account</CardTitle>
+        <CardDescription>
+          Connect your GitHub profile to start earning contributor NFTs
         </CardDescription>
       </CardHeader>
       
-      <CardContent className="pt-6 space-y-6">
-        <div className="p-4 bg-muted rounded-lg text-sm border">
-          <div className="flex items-start gap-2 mb-2">
-            <div className="bg-green-500 text-white p-1 rounded-full mt-0.5">
-              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="m5 12 5 5L20 7"></path>
-              </svg>
-            </div>
-            <div>
-              <span className="font-medium">Wallet Connected:</span> {address ? `${address.substring(0, 6)}...${address.substring(address.length - 4)}` : 'Not connected'}
-            </div>
-          </div>
-          
-          <div className="flex items-start gap-2">
-            <div className={`${user?.githubUser ? 'bg-green-500' : 'bg-amber-500'} text-white p-1 rounded-full mt-0.5`}>
-              {user?.githubUser ? (
-                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="m5 12 5 5L20 7"></path>
-                </svg>
-              ) : (
-                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="12" x2="12" y1="5" y2="19"></line>
-                  <line x1="5" x2="19" y1="12" y2="12"></line>
-                </svg>
-              )}
-            </div>
-            <div>
-              <span className="font-medium">GitHub Account:</span> {user?.githubUser ? user.githubUser.login : 'Not connected'}
-            </div>
-          </div>
+      <CardContent className="flex flex-col items-center gap-4">
+        <div className="flex items-center justify-center w-16 h-16 rounded-full bg-primary/10">
+          <svg 
+            viewBox="0 0 24 24" 
+            className="w-10 h-10 text-primary"
+            fill="currentColor"
+          >
+            <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12" />
+          </svg>
         </div>
         
-        <div>
-          <h3 className="text-lg font-medium mb-3">Benefits of Connecting</h3>
-          <ul className="space-y-3">
-            <li className="flex gap-3">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-500 mt-0.5"><circle cx="12" cy="12" r="10"></circle><path d="m9 12 2 2 4-4"></path></svg>
-              <div>
-                <span className="font-medium">Track Your Contributions</span>
-                <p className="text-sm text-muted-foreground">See all your GitHub contributions in one place</p>
-              </div>
+        <div className="text-center space-y-2">
+          <h3 className="font-medium text-lg">GitHub Profile Connection</h3>
+          <p className="text-muted-foreground">
+            Link your GitHub account to verify your contributions and earn rewards
+          </p>
+        </div>
+        
+        {!isConnected && (
+          <div className="bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300 p-3 rounded-md text-sm">
+            <p className="flex items-center gap-2">
+              <span className="text-amber-500">⚠️</span>
+              Please connect your wallet first
+            </p>
+          </div>
+        )}
+        
+        <div className="w-full max-w-xs space-y-3">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">You'll get...</span>
+          </div>
+          
+          <ul className="space-y-2 text-sm">
+            <li className="flex items-start gap-2">
+              <svg className="w-5 h-5 text-green-500 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+              </svg>
+              <span>Mint NFTs for your open-source contributions</span>
             </li>
-            <li className="flex gap-3">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-500 mt-0.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
-              <div>
-                <span className="font-medium">Earn Contributor NFTs</span>
-                <p className="text-sm text-muted-foreground">Get rewarded with NFTs for your open-source work</p>
-              </div>
+            <li className="flex items-start gap-2">
+              <svg className="w-5 h-5 text-green-500 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+              </svg>
+              <span>Share your contributions on Lens Protocol</span>
             </li>
-            <li className="flex gap-3">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-500 mt-0.5"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-              <div>
-                <span className="font-medium">Join the Developer Community</span>
-                <p className="text-sm text-muted-foreground">Connect with other Web3 developers</p>
-              </div>
+            <li className="flex items-start gap-2">
+              <svg className="w-5 h-5 text-green-500 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+              </svg>
+              <span>Build your on-chain developer reputation</span>
             </li>
           </ul>
         </div>
       </CardContent>
       
-      <CardFooter className="flex justify-between pt-2 border-t">
-        {user?.githubUser ? (
-          <>
-            <div className="flex items-center gap-2">
-              <img 
-                src={user.githubUser.avatar_url} 
-                alt={user.githubUser.login} 
-                className="w-8 h-8 rounded-full"
-              />
-              <div className="text-sm">
-                <div className="font-medium">{user.githubUser.name || user.githubUser.login}</div>
-                <div className="text-muted-foreground">@{user.githubUser.login}</div>
-              </div>
-            </div>
-            <Button onClick={onComplete}>Continue</Button>
-          </>
-        ) : isProcessing ? (
-          <Button disabled className="w-full">
-            <Spinner className="mr-2 h-4 w-4" /> Connecting...
-          </Button>
+      <CardFooter>
+        {!isConnected ? (
+          <ConnectWalletButton className="w-full" size="lg" />
         ) : (
-          <Button onClick={handleConnectGitHub} className="w-full">
-            Connect GitHub
+          <Button 
+            onClick={handleGitHubConnect} 
+            disabled={isLoading || !isConnected}
+            className="w-full"
+            size="lg"
+          >
+            {isLoading ? (
+              <>
+                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Connecting...
+              </>
+            ) : (
+              <>
+                <svg viewBox="0 0 24 24" className="w-5 h-5 mr-2 -ml-1" fill="currentColor">
+                  <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12" />
+                </svg>
+                Connect with GitHub
+              </>
+            )}
           </Button>
         )}
       </CardFooter>

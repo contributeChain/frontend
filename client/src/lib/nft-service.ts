@@ -1,7 +1,8 @@
 import { ContractFunctionExecutionError } from "viem";
-import { uploadNftMetadata } from "./groveClient";
+import { storageClient } from "@/lib/groveClient";
 import { createPublicClient, http, createWalletClient, custom, parseEther } from "viem";
-import { base, baseGoerli } from "viem/chains";
+import { lens, lensTestnet } from "wagmi/chains";
+import { DEFAULT_NETWORK, getNftContractAddress } from "@/config/contracts";
 
 // ContributorNFT contract ABI (partial - only functions we need)
 const contributorNftAbi = [
@@ -112,16 +113,12 @@ const contributorNftAbi = [
   }
 ];
 
-//TODO: Add mainnet contract address
-// Contract address from the deployment
-export const CONTRIBUTOR_NFT_ADDRESS = import.meta.env.VITE_NEXT_PUBLIC_NETWORK === "testnet" ? "0x31F8fC3Bcada00d64ce6bB3D4D22d9814530feD8" : "//mainnet contract address";
+// Get contract address from config
+export const CONTRIBUTOR_NFT_ADDRESS = getNftContractAddress();
 
-// Set the chain based on environment
-const chain = import.meta.env.VITE_NEXT_PUBLIC_NETWORK === "mainnet" ? base : baseGoerli;
-
-// Create a public client for read operations
+// Create a public client for read operations using the default provider for the selected chain
 const publicClient = createPublicClient({
-  chain,
+  chain: DEFAULT_NETWORK === 'mainnet' ? lens : lensTestnet,
   transport: http()
 });
 
@@ -129,10 +126,17 @@ const publicClient = createPublicClient({
  * Creates a wallet client from an ethereum provider
  */
 export function createWalletClientFromProvider(provider: any) {
-  return createWalletClient({
-    chain,
-    transport: custom(provider)
-  });
+  if(DEFAULT_NETWORK === 'mainnet') {
+    return createWalletClient({
+      chain: lens,
+      transport: custom(provider)
+    });
+  } else {
+    return createWalletClient({
+      chain: lensTestnet,
+      transport: custom(provider)
+    });
+  }
 }
 
 /**
@@ -163,49 +167,81 @@ export function calculateContributionScore(
 }
 
 /**
- * Get rarity level based on contribution score
+ * Upload NFT metadata to Grove storage
+ * @param metadata NFT metadata object
+ * @param walletAddress User's wallet address
+ * @returns Upload result from Grove storage
  */
-export function getRarityLevel(score: number): {
-  name: string;
-  color: string;
-  level: number;
-} {
-  if (score >= 1000) {
-    return { name: "Legendary", color: "#FF8C00", level: 5 };
-  } else if (score >= 500) {
-    return { name: "Epic", color: "#9932CC", level: 4 };
-  } else if (score >= 200) {
-    return { name: "Rare", color: "#1E90FF", level: 3 };
-  } else if (score >= 50) {
-    return { name: "Uncommon", color: "#32CD32", level: 2 };
-  } else {
-    return { name: "Common", color: "#808080", level: 1 };
+export async function uploadNftMetadata(metadata: any, walletAddress: `0x${string}`) {
+  try {
+    const uploadResult = await storageClient.uploadAsJson(metadata);
+    return uploadResult;
+  } catch (error) {
+    console.error("Error uploading NFT metadata:", error);
+    throw new Error("Failed to upload NFT metadata to storage");
   }
 }
 
 /**
- * Generate an image URL for the NFT based on repository and score
- * This is a placeholder - in a real app, you'd generate proper images
+ * Calculate rarity level based on contribution score
+ * @param score Contribution score
+ * @returns Rarity information including name and color
+ */
+export function getRarityLevel(score: number) {
+  if (score >= 1000) {
+    return { name: "Legendary", color: "#FF8C00" }; // Orange
+  } else if (score >= 500) {
+    return { name: "Epic", color: "#9932CC" }; // Purple
+  } else if (score >= 200) {
+    return { name: "Rare", color: "#1E90FF" }; // Blue
+  } else if (score >= 50) {
+    return { name: "Uncommon", color: "#32CD32" }; // Green
+  } else {
+    return { name: "Common", color: "#808080" }; // Gray
+  }
+}
+
+/**
+ * Generate NFT image URL
+ * @param repoName Repository name
+ * @param contributorName Contributor name
+ * @param score Contribution score
+ * @param rarity Rarity information
+ * @returns URL for the NFT image
  */
 export function generateNftImageUrl(
-  repositoryName: string,
+  repoName: string,
   contributorName: string,
   score: number,
   rarity: { name: string; color: string }
 ): string {
-  // In a real app, you'd generate proper NFT images
-  // This is just a placeholder - you would use a real NFT image generator or API
-  return `https://via.placeholder.com/500x500.png?text=${repositoryName}+${rarity.name}`;
+  // Encode parameters for URL
+  const encodedRepo = encodeURIComponent(repoName);
+  const encodedContributor = encodeURIComponent(contributorName);
+  const encodedScore = encodeURIComponent(score.toString());
+  const encodedRarity = encodeURIComponent(rarity.name);
+  const encodedColor = encodeURIComponent(rarity.color.replace('#', ''));
+  
+  // Use our own SVG image generator
+  return `/api/nft-image/generate?repo=${encodedRepo}&contributor=${encodedContributor}&score=${encodedScore}&rarity=${encodedRarity}&color=${encodedColor}`;
 }
 
 /**
- * Create NFT metadata for a contributor
+ * Create NFT metadata
+ * @param repo Repository name
+ * @param repoUrl Repository URL
+ * @param contributor Contributor information
+ * @param stats Contribution statistics
+ * @param ownerAddress Owner wallet address
+ * @param customImageUrl Optional custom image URL from Grove storage
+ * @param attributes Optional additional attributes
+ * @returns Result of metadata creation
  */
 export async function createNftMetadata(
-  repositoryName: string,
-  repositoryUrl: string,
+  repo: string,
+  repoUrl: string,
   contributor: {
-    name: string;
+    name?: string;
     login: string;
     avatar_url: string;
   },
@@ -215,140 +251,142 @@ export async function createNftMetadata(
     deletions: number;
     pullRequests: number;
     issues: number;
+    score: number;
   },
-  walletAddress: `0x${string}`
+  ownerAddress: `0x${string}`,
+  customImageUrl?: string,
+  attributes?: Array<{ trait_type: string; value: string }>
 ) {
-  const score = calculateContributionScore(
-    stats.commits,
-    stats.additions,
-    stats.deletions,
-    stats.pullRequests,
-    stats.issues
-  );
-  
-  const rarity = getRarityLevel(score);
-  
-  // In a production app, you'd generate a real image
-  // For this example, we'll use a placeholder
-  const imageUrl = generateNftImageUrl(
-    repositoryName,
-    contributor.name || contributor.login,
-    score,
-    rarity
-  );
-  
-  const metadata = {
-    name: `${repositoryName} Contributor: ${contributor.login}`,
-    description: `Recognition for contributions to ${repositoryName}. Contribution Score: ${score}`,
-    image: imageUrl,
-    external_url: repositoryUrl,
-    attributes: [
-      {
-        trait_type: "Repository",
-        value: repositoryName
-      },
-      {
-        trait_type: "Contributor",
-        value: contributor.login
-      },
-      {
-        trait_type: "Contribution Score",
-        value: score
-      },
-      {
+  try {
+    // Generate NFT name and description
+    const name = `${repo} Contribution - ${contributor.name || contributor.login}`;
+    const description = `This NFT represents contributions to ${repo} by ${
+      contributor.name || contributor.login
+    } (${contributor.login}).`;
+
+    // Default attributes if none provided
+    const nftAttributes = attributes || [
+      { trait_type: "Repository", value: repo },
+      { trait_type: "Contributor", value: contributor.login },
+      { trait_type: "Contribution Score", value: stats.score.toString() },
+      { trait_type: "Commits", value: stats.commits.toString() },
+      { trait_type: "Additions", value: stats.additions.toString() },
+      { trait_type: "Deletions", value: stats.deletions.toString() },
+      { trait_type: "Pull Requests", value: stats.pullRequests.toString() },
+      { trait_type: "Issues", value: stats.issues.toString() },
+    ];
+
+    // Determine rarity level
+    const rarity = getRarityLevel(stats.score);
+    
+    // Add rarity attribute if not already included
+    if (!nftAttributes.find(attr => attr.trait_type === "Rarity")) {
+      nftAttributes.push({
         trait_type: "Rarity",
         value: rarity.name
+      });
+    }
+
+    // Use custom image URL if provided, otherwise generate one
+    const imageUrl = customImageUrl || 
+      generateNftImageUrl(repo, contributor.name || contributor.login, stats.score, rarity);
+
+    // Create metadata object
+    const metadata = {
+      name,
+      description,
+      image: imageUrl,
+      attributes: nftAttributes,
+      external_url: repoUrl,
+      properties: {
+        repository: repo,
+        contributor: contributor.login,
+        score: stats.score,
+        commits: stats.commits,
+        additions: stats.additions,
+        deletions: stats.deletions,
+        pullRequests: stats.pullRequests,
+        issues: stats.issues,
+        ownerAddress,
       },
-      {
-        trait_type: "Commits",
-        value: stats.commits
-      },
-      {
-        trait_type: "Lines Added",
-        value: stats.additions
-      },
-      {
-        trait_type: "Lines Deleted",
-        value: stats.deletions
-      },
-      {
-        trait_type: "Pull Requests",
-        value: stats.pullRequests
-      },
-      {
-        trait_type: "Issues",
-        value: stats.issues
-      }
-    ]
-  };
-  
-  // Upload metadata to Grove
-  const uploadResult = await uploadNftMetadata(metadata, walletAddress);
-  
-  return {
-    metadata,
-    score,
-    rarity,
-    uploadResult
-  };
+    };
+
+    // Upload metadata to Grove
+    const uploadResult = await uploadNftMetadata(metadata, ownerAddress);
+    
+    console.log("Metadata URI:", uploadResult.uri);
+    return { success: true, metadata, uploadResult };
+  } catch (error) {
+    console.error("Error creating NFT metadata:", error);
+    throw error;
+  }
 }
 
 /**
- * Mint a new contribution NFT
+ * Mint a contribution NFT
+ * @param client Wallet client
+ * @param recipient Recipient wallet address
+ * @param repoUrl Repository URL
+ * @param score Contribution score
+ * @param metadataUri URI of the NFT metadata
+ * @returns Result of minting operation
  */
 export async function mintContributionNft(
-  provider: any,
-  walletAddress: `0x${string}`,
-  repositoryUrl: string,
-  contributionScore: number,
+  client: any,
+  recipient: `0x${string}`,
+  repoUrl: string,
+  score: number,
   metadataUri: string
-) {
+): Promise<{ success: boolean; transactionHash?: string; error?: string }> {
   try {
-    // Create wallet client if provider is available
-    const walletClient = provider ? createWalletClientFromProvider(provider) : null;
-    
-    if (!walletClient) {
-      // Use a more compatible approach without provider
-      return {
-        success: false,
-        error: "No wallet provider available. Please connect your wallet."
-      };
+    if (!client) {
+      throw new Error("Wallet client is required for minting NFTs");
     }
+
+    const contractAddress = getNftContractAddress() as `0x${string}`;
     
-    // Prepare transaction
-    const { request } = await publicClient.simulateContract({
-      address: CONTRIBUTOR_NFT_ADDRESS as `0x${string}`,
+    console.log("Contract Address:", contractAddress);
+    console.log("Recipient:", recipient);
+    console.log("Repo URL:", repoUrl);
+    console.log("Score:", score);
+    console.log("Metadata URI:", metadataUri);
+
+    // Prepare the transaction request
+    const request = {
+      address: contractAddress,
       abi: contributorNftAbi,
-      functionName: 'mintContribution',
-      args: [walletAddress, repositoryUrl, BigInt(contributionScore), metadataUri]
-    });
-    
-    // Send transaction with account specified
-    const hash = await walletClient.writeContract({
-      ...request,
-      account: walletAddress
-    });
-    
-    // Wait for transaction
-    const receipt = await publicClient.waitForTransactionReceipt({ hash });
+      functionName: "mintContribution",
+      args: [
+        recipient,
+        repoUrl,
+        BigInt(score),
+        metadataUri
+      ],
+      account: recipient,
+      // chain: alchemyConfig.chain
+    };
+
+    // Write the contract directly without simulation
+    const hash = await client.writeContract(request);
     
     return {
       success: true,
-      transactionHash: hash,
-      receipt
+      transactionHash: hash
     };
   } catch (error: any) {
-    console.error("Error minting NFT:", error);
-    
-    let errorMessage = "Failed to mint NFT";
+    // Handle contract errors more specifically
     if (error instanceof ContractFunctionExecutionError) {
-      // Try to extract a more specific error message
-      errorMessage = error.message.split("Contract Function Execution Error:")[1]?.trim() || errorMessage;
+      console.error("Contract execution error:", error.cause);
+      return {
+        success: false,
+        error: `Contract error: ${error.cause || error.message}`
+      };
     }
     
+    console.error("Error minting NFT:", error);
     return {
       success: false,
-      error: errorMessage
+      error: error.message || "Failed to mint NFT"
     };
   }
 }

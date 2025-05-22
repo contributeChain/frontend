@@ -1,13 +1,60 @@
 import { Link } from "wouter";
 import { formatTimeAgo } from "@/lib/utils";
-import { type Repository } from "@/lib/grove-service";
+import { type Repository, addRepositoryFollowActivity, getUserByWalletAddress, isFollowingRepository, hasUserMintedNFTForRepo } from "@/lib/grove-service";
+import { Button } from "@/components/ui/button";
+import { useAccount } from "wagmi";
+import { useState, useEffect } from "react";
+import { useToast } from "@/hooks/use-toast";
+import { useGrove } from "@/hooks/use-grove";
 
 interface RepositoryCardProps {
   repository: Repository;
   username: string;
+  onRefresh?: () => Promise<void>;
 }
 
-export default function RepositoryCard({ repository, username }: RepositoryCardProps) {
+export default function RepositoryCard({ repository, username, onRefresh }: RepositoryCardProps) {
+  const { address, isConnected } = useAccount();
+  const { refreshGroveData } = useGrove();
+  const { toast } = useToast();
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [hasUserMinted, setHasUserMinted] = useState(false);
+  
+  // Check if user is already following this repository when component mounts
+  useEffect(() => {
+    const checkFollowingStatus = async () => {
+      if (isConnected && address) {
+        try {
+          const repoFullName = `${username}/${repository.name}`;
+          const following = await isFollowingRepository(address, repoFullName);
+          setIsFollowing(following);
+        } catch (error) {
+          console.error("Error checking repository following status:", error);
+        }
+      }
+    };
+    
+    checkFollowingStatus();
+  }, [address, isConnected, repository.name, username]);
+  
+  // Check if user has already minted an NFT for this repository
+  useEffect(() => {
+    const checkUserMinted = async () => {
+      if (!isConnected || !address) return;
+      
+      try {
+        const repoFullName = `${username}/${repository.name}`;
+        const hasMinted = await hasUserMintedNFTForRepo(address, repoFullName);
+        setHasUserMinted(hasMinted);
+      } catch (error) {
+        console.error("Error checking if user has minted:", error);
+      }
+    };
+    
+    checkUserMinted();
+  }, [address, isConnected, repository.name, username]);
+  
   // Get repository icon based on the repository language or name
   const getRepositoryIcon = () => {
     const language = repository.language?.toLowerCase() || '';
@@ -84,33 +131,94 @@ export default function RepositoryCard({ repository, username }: RepositoryCardP
     }
   };
   
+  // Handle repository follow
+  const handleFollow = async () => {
+    if (!isConnected || !address) {
+      toast({
+        title: "Authentication Required",
+        description: "Please connect your wallet to follow repositories",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setIsProcessing(true);
+    
+    try {
+      // Get user data for the current wallet address
+      const user = await getUserByWalletAddress(address);
+      
+      if (!user) {
+        toast({
+          title: "Error",
+          description: "User profile not found. Please create a profile first.",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      // Add repository follow activity
+      const repoFullName = `${username}/${repository.name}`;
+      const success = await addRepositoryFollowActivity(repoFullName, user, address as `0x${string}`);
+      
+      if (success) {
+        setIsFollowing(true);
+        toast({
+          title: "Success",
+          description: `You are now following ${repoFullName}`
+        });
+        
+        // Refresh data to update UI
+        refreshGroveData();
+        if (onRefresh) {
+          await onRefresh();
+        }
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to follow repository. Please try again.",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error("Error following repository:", error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+  
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-100 dark:border-gray-700 overflow-hidden transition-all duration-200 hover:shadow-lg hover:border-primary/20 dark:hover:border-primary/20">
+    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-100 dark:border-gray-700 overflow-hidden transition-all duration-200 hover:shadow-lg hover:border-primary/20 dark:hover:border-primary/20 flex flex-col h-full">
       <Link href={`/repositories/${repository.id}`}>
-        <a className="block cursor-pointer">
-          <div className="p-6">
+        <a className="block cursor-pointer flex-1">
+          <div className="p-6 h-full flex flex-col">
             <div className="flex justify-between items-start mb-4">
-              <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 ${getIconColorClass()} rounded-full flex items-center justify-center`}>
+              <div className="flex items-center gap-3 min-w-0">
+                <div className={`w-10 h-10 ${getIconColorClass()} rounded-full flex items-center justify-center flex-shrink-0`}>
                   <i className={`fas ${getRepositoryIcon()}`}></i>
                 </div>
-                <div>
-                  <h3 className="font-display font-bold text-lg">{repository.name}</h3>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">by {username}</p>
+                <div className="min-w-0">
+                  <h3 className="font-display font-bold text-lg truncate">{repository.name}</h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 truncate">by {username}</p>
                 </div>
               </div>
-              <div className="flex items-center gap-1">
-                <div className={`text-xs px-2 py-1 ${getTagColorClass()} rounded-full`}>
+              <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+                <div className={`text-xs px-2 py-1 ${getTagColorClass()} rounded-full whitespace-nowrap`}>
                   {getRepositoryTag()}
                 </div>
               </div>
             </div>
             
-            <p className="text-gray-600 dark:text-gray-400 text-sm mb-4">
+            <p className="text-gray-600 dark:text-gray-400 text-sm mb-4 line-clamp-2 break-words">
               {repository.description || "No description provided."}
             </p>
             
-            <div className="flex justify-between items-center text-sm">
+            <div className="flex justify-between items-center text-sm mt-auto">
               <div className="flex items-center gap-4">
                 <span className="flex items-center gap-1 text-gray-500 dark:text-gray-400">
                   <i className="fas fa-star"></i>
@@ -130,18 +238,49 @@ export default function RepositoryCard({ repository, username }: RepositoryCardP
         </a>
       </Link>
       
-      <div className="border-t border-gray-100 dark:border-gray-700 p-4">
+      <div className="border-t border-gray-100 dark:border-gray-700 p-4 mt-auto">
         <div className="flex justify-between items-center">
-          <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+          <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 truncate">
             <span>Updated {repository.lastUpdated ? formatTimeAgo(repository.lastUpdated) : 'recently'}</span>
           </div>
-          <div className="flex items-center gap-2">
-            <Link href={`/mint-nft?repo=${username}/${repository.name}`}>
-              <a className="text-secondary hover:text-secondary/90 text-sm font-medium flex items-center gap-1">
-                <i className="fas fa-award text-xs"></i>
-                Mint NFT
-              </a>
-            </Link>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {isConnected && (
+              <Button
+                size="sm" 
+                variant="outline"
+                className={`text-xs ${isFollowing ? 'bg-primary/10 text-primary border-primary/20' : ''}`}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleFollow();
+                }}
+                disabled={isProcessing || isFollowing}
+              >
+                {isProcessing ? (
+                  <i className="fas fa-spinner fa-spin mr-1"></i>
+                ) : isFollowing ? (
+                  <i className="fas fa-check mr-1"></i>
+                ) : (
+                  <i className="fas fa-bell mr-1"></i>
+                )}
+                {isFollowing ? "Following" : "Follow"}
+              </Button>
+            )}
+            {isConnected && (
+              hasUserMinted ? (
+                <span className="text-secondary/60 text-xs flex items-center gap-1 px-2 py-1 bg-secondary/5 rounded-md">
+                  <i className="fas fa-check-circle text-xs"></i>
+                  Already Minted
+                </span>
+              ) : (
+                <Link href={`/mint-nft?repo=${username}/${repository.name}`}>
+                  <a className="text-secondary hover:text-secondary/90 text-sm font-medium flex items-center gap-1">
+                    <i className="fas fa-award text-xs"></i>
+                    Mint NFT
+                  </a>
+                </Link>
+              )
+            )}
             <Link href={`/repositories/${repository.id}`}>
               <a className="text-primary hover:text-primary/90 text-sm font-medium">View Details</a>
             </Link>

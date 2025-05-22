@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
-import { fetchGitHubContributions, getContributionColorClass } from "@/lib/github-utils";
+import { getContributionColorClass } from "@/lib/github-utils";
+import { getUserStatistics } from "@/lib/githubClient";
+import type { CommitsByDate } from "@/lib/githubClient";
 
 interface ContributionGridProps {
   username: string;
@@ -27,7 +29,7 @@ const MONTHS: MonthLabel[] = [
 ];
 
 export default function ContributionGrid({ username, year = new Date().getFullYear() }: ContributionGridProps) {
-  const [contributions, setContributions] = useState<{ date: string; count: number }[]>([]);
+  const [contributions, setContributions] = useState<CommitsByDate[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
@@ -37,9 +39,9 @@ export default function ContributionGrid({ username, year = new Date().getFullYe
       setError(null);
       
       try {
-        const data = await fetchGitHubContributions(username);
+        const data = await getUserStatistics(username);
         // Filter contributions for the selected year
-        const filteredData = data.filter(contribution => {
+        const filteredData = data.commitsByDate.filter((contribution: CommitsByDate) => {
           const contributionYear = new Date(contribution.date).getFullYear();
           return contributionYear === year;
         });

@@ -5,10 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
 import { Container } from "@/components/layout/container";
+import { Spinner } from "@/components/ui/spinner";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/providers/AuthProvider";
+import { useAuth } from "@/hooks/use-auth";
+import { useAccount } from "wagmi";
 import { getRepository, getRepositoryContributions, GitHubRepository } from "@/lib/githubClient";
-import { getRepositoryById, Repository } from "@/lib/grove-service";
+import { getRepositoryById, Repository, getNFTsByRepoName, NFT, hasUserMintedNFTForRepo } from "@/lib/grove-service";
+import NFTCard from "@/components/nft-card";
 
 // Define a type for GitHub contributions based on the actual structure
 interface GithubContributor {
@@ -33,12 +36,16 @@ export default function RepositoryDetailPage({ params }: RepositoryDetailPagePro
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const { isAuthenticated, user } = useAuth();
+  const { address } = useAccount();
   const [repository, setRepository] = useState<Repository | null>(null);
   const [githubRepo, setGithubRepo] = useState<GitHubRepository | null>(null);
   const [contributions, setContributions] = useState<GithubContributor[] | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [repositoryNfts, setRepositoryNfts] = useState<NFT[]>([]);
+  const [isLoadingNfts, setIsLoadingNfts] = useState(false);
+  const [hasUserMinted, setHasUserMinted] = useState(false);
 
   // Fetch repository data
   useEffect(() => {
@@ -111,6 +118,42 @@ export default function RepositoryDetailPage({ params }: RepositoryDetailPagePro
     
     fetchRepositoryData();
   }, [id, toast]);
+
+  // Fetch NFTs associated with this repository
+  useEffect(() => {
+    const fetchRepositoryNfts = async () => {
+      if (!repository) return;
+      
+      setIsLoadingNfts(true);
+      try {
+        // Use the repository name to fetch associated NFTs
+        const nfts = await getNFTsByRepoName(repository.name);
+        setRepositoryNfts(nfts);
+      } catch (error) {
+        console.error("Error fetching repository NFTs:", error);
+      } finally {
+        setIsLoadingNfts(false);
+      }
+    };
+    
+    fetchRepositoryNfts();
+  }, [repository]);
+
+  // Check if the current user has already minted an NFT for this repository
+  useEffect(() => {
+    const checkUserMinted = async () => {
+      if (!repository || !address) return;
+      
+      try {
+        const hasMinted = await hasUserMintedNFTForRepo(address, repository.name);
+        setHasUserMinted(hasMinted);
+      } catch (error) {
+        console.error("Error checking if user has minted:", error);
+      }
+    };
+    
+    checkUserMinted();
+  }, [repository, address]);
 
   // Format date for display
   const formatDate = (dateString: string | Date | null) => {
@@ -301,24 +344,48 @@ export default function RepositoryDetailPage({ params }: RepositoryDetailPagePro
                         size="sm"
                         variant="secondary"
                         onClick={() => navigate(`/mint-nft?repo=${repoOwner || ''}/${repoName || repository.name}`)}
-                        disabled={!repoOwner || !repoName}
+                        disabled={!repoOwner || !repoName || hasUserMinted}
+                        title={hasUserMinted ? "You have already minted an NFT for this repository" : ""}
                       >
                         <i className="fas fa-award mr-2"></i>
-                        Mint NFT
+                        {hasUserMinted ? "Already Minted" : "Mint NFT"}
                       </Button>
-                      <Button size="sm">
+                      <Button 
+                        size="sm"
+                        onClick={() => navigate(`/repositories/${id}/nfts`)}
+                        disabled={repositoryNfts.length === 0}
+                      >
                         <i className="fas fa-certificate mr-2"></i>
                         View NFTs
                       </Button>
                     </div>
                   </div>
                   
-                  {(repository.nftCount || 0) > 0 ? (
+                  {isLoadingNfts ? (
+                    <div className="flex justify-center py-8">
+                      <Spinner />
+                    </div>
+                  ) : repositoryNfts.length > 0 ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* NFT cards would go here */}
-                      <p className="col-span-2 text-gray-600 dark:text-gray-400">
-                        This repository has {repository.nftCount} on-chain credentials.
-                      </p>
+                      {repositoryNfts.slice(0, 4).map((nft) => (
+                        <div 
+                          key={nft.id}
+                          className="cursor-pointer"
+                          onClick={() => navigate(`/repositories/${id}/nfts/${nft.id}`)}
+                        >
+                          <NFTCard nft={nft} size="small" />
+                        </div>
+                      ))}
+                      {repositoryNfts.length > 4 && (
+                        <div className="col-span-full flex justify-center mt-4">
+                          <Button 
+                            variant="outline" 
+                            onClick={() => navigate(`/repositories/${id}/nfts`)}
+                          >
+                            View All {repositoryNfts.length} NFTs
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="text-center py-8">

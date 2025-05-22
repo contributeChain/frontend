@@ -1,29 +1,25 @@
-import React from "react";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import React, { useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
-import { getRarityLevel } from "@/lib/nft-service";
+import { Skeleton } from "../ui/skeleton";
+import { ContributionStatsData } from "./ContributionStats";
+import NftBackgroundChanger from "./NftBackgroundChanger";
 
-interface NftPreviewCardProps {
+export interface NftPreviewCardProps {
   repositoryName: string;
   repositoryUrl: string;
-  contributor: {
-    name?: string;
-    login: string;
-    avatar_url: string;
-  };
-  contributionStats: {
-    commits: number;
-    additions: number;
-    deletions: number;
-    pullRequests: number;
-    issues: number;
-  };
+  contributor: any;
+  contributionStats: ContributionStatsData;
   contributionScore: number;
-  imageUrl: string;
+  imageUrl?: string;
   isMinting: boolean;
-  onMint: () => void;
+  onMint: (customImageUrl?: string) => void;
+  rarityTier?: { name: string; color: string } | null;
+  mintingSuccess?: boolean;
+  onViewNft?: () => void;
+  accountAddress: `0x${string}`;
 }
 
 export function NftPreviewCard({
@@ -34,117 +30,151 @@ export function NftPreviewCard({
   contributionScore,
   imageUrl,
   isMinting,
-  onMint
+  onMint,
+  rarityTier,
+  mintingSuccess = false,
+  onViewNft,
+  accountAddress
 }: NftPreviewCardProps) {
-  const rarity = getRarityLevel(contributionScore);
-  const displayName = contributor.name || contributor.login;
-
+  const [isChangingBackground, setIsChangingBackground] = useState(false);
+  const [customImageUrl, setCustomImageUrl] = useState<string | undefined>(undefined);
+  
+  // Handle image generation from background changer
+  const handleImageGenerated = (imageUrl: string, imageBlob: Blob) => {
+    setCustomImageUrl(imageUrl);
+    setIsChangingBackground(false);
+  };
+  
+  // Handle mint with custom image
+  const handleMint = () => {
+    onMint(customImageUrl);
+  };
+  
   return (
-    <Card className="w-full max-w-md mx-auto overflow-hidden">
-      <CardHeader className="bg-gradient-to-r from-gray-800 to-black text-white">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-lg font-bold">
+    <Card className="overflow-hidden h-full flex flex-col">
+      <CardHeader className="flex flex-row items-start justify-between space-y-0">
+        <div>
+          <CardTitle className="text-xl">
             {repositoryName} Contribution NFT
           </CardTitle>
-          <Badge
-            style={{ backgroundColor: rarity.color, color: "#fff" }}
-            className="px-3 py-1 text-xs font-bold uppercase tracking-wide"
-          >
-            {rarity.name}
-          </Badge>
+          {rarityTier && (
+            <Badge
+              style={{ backgroundColor: rarityTier.color, color: "#fff" }}
+              className="px-3 py-1 text-xs font-bold uppercase tracking-wide"
+            >
+              {rarityTier.name}
+            </Badge>
+          )}
         </div>
       </CardHeader>
-
-      <CardContent className="p-0 relative">
-        <div className="p-6 pb-2">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-full overflow-hidden">
-              <img
-                src={contributor.avatar_url}
-                alt={displayName}
+      
+      <CardContent className="p-0 flex-grow flex flex-col">
+        <div className="relative w-full">
+          {(customImageUrl || imageUrl) ? (
+            <div className="aspect-square w-full relative overflow-hidden">
+              <img 
+                src={customImageUrl || imageUrl} 
+                alt={`${repositoryName} contribution NFT`}
                 className="w-full h-full object-cover"
               />
+              
+              {!mintingSuccess && !isMinting && (
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setIsChangingBackground(true)}
+                  className="absolute top-2 right-2 bg-white/80 hover:bg-white dark:bg-gray-800/80 dark:hover:bg-gray-800"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                  <span className="ml-1">Change BG</span>
+                </Button>
+              )}
             </div>
-            <div>
-              <h3 className="text-md font-semibold">{displayName}</h3>
-              <p className="text-sm text-gray-500">@{contributor.login}</p>
+          ) : (
+            <div className="aspect-square w-full flex items-center justify-center bg-gray-100 dark:bg-gray-800">
+              <Skeleton className="w-4/5 h-4/5" />
+            </div>
+          )}
+          
+          {isChangingBackground && (
+            <NftBackgroundChanger
+              repositoryName={repositoryName}
+              contributorName={contributor.name || contributor.login}
+              contributionScore={contributionScore}
+              rarityTier={rarityTier || { name: "Common", color: "#718096" }}
+              onImageGenerated={handleImageGenerated}
+              accountAddress={accountAddress}
+              contributionStats={contributionStats}
+              onCancel={() => setIsChangingBackground(false)}
+            />
+          )}
+        </div>
+        
+        <div className="p-4 space-y-4 mt-auto">
+          <div className="flex items-center space-x-2">
+            <img 
+              src={contributor.avatar_url} 
+              alt={contributor.login}
+              className="w-6 h-6 rounded-full"
+            />
+            <a 
+              href={`https://github.com/${contributor.login}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm hover:underline"
+            >
+              @{contributor.login}
+            </a>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-2">
+            <div className="bg-gray-100 dark:bg-gray-800 p-2 rounded">
+              <div className="text-xs text-gray-500 dark:text-gray-400">Score</div>
+              <div className="font-medium">{contributionScore}</div>
+            </div>
+            <div className="bg-gray-100 dark:bg-gray-800 p-2 rounded">
+              <div className="text-xs text-gray-500 dark:text-gray-400">Commits</div>
+              <div className="font-medium">{contributionStats.commits}</div>
+            </div>
+            <div className="bg-gray-100 dark:bg-gray-800 p-2 rounded">
+              <div className="text-xs text-gray-500 dark:text-gray-400">PRs</div>
+              <div className="font-medium">{contributionStats.pullRequests}</div>
+            </div>
+            <div className="bg-gray-100 dark:bg-gray-800 p-2 rounded">
+              <div className="text-xs text-gray-500 dark:text-gray-400">Issues</div>
+              <div className="font-medium">{contributionStats.issues}</div>
             </div>
           </div>
-        </div>
-
-        <div className="px-6 pb-4">
-          <div className="aspect-square max-h-72 w-full overflow-hidden rounded-lg bg-gray-100 mb-4 flex items-center justify-center">
-            {imageUrl ? (
-              <img
-                src={imageUrl}
-                alt={`NFT for ${displayName}'s contributions to ${repositoryName}`}
-                className="w-full h-full object-contain"
-              />
+          
+          <div className="flex gap-2">
+            {mintingSuccess ? (
+              <Button 
+                className="flex-1 bg-green-600 hover:bg-green-700"
+                onClick={onViewNft}
+              >
+                <i className="fas fa-eye mr-2"></i>
+                View NFT
+              </Button>
             ) : (
-              <div className="text-center p-4">
-                <Spinner size="lg" className="mx-auto mb-2" />
-                <p className="text-sm text-gray-500">Generating preview...</p>
-              </div>
+              <Button 
+                className="flex-1"
+                disabled={isMinting}
+                onClick={handleMint}
+                variant={customImageUrl ? "default" : "outline"}
+              >
+                {isMinting ? (
+                  <>
+                    <Spinner size="sm" className="mr-2" /> 
+                    Processing...
+                  </>
+                ) : (
+                  customImageUrl ? 'Mint NFT' : 'Mint Default NFT'
+                )}
+              </Button>
             )}
-          </div>
-
-          <h4 className="font-medium text-sm mb-2">Contribution Stats</h4>
-          <div className="grid grid-cols-2 gap-2 text-sm">
-            <div className="flex justify-between items-center p-2 bg-gray-50 dark:bg-gray-800 rounded">
-              <span className="text-gray-500">Commits</span>
-              <span className="font-medium">{contributionStats.commits}</span>
-            </div>
-            <div className="flex justify-between items-center p-2 bg-gray-50 dark:bg-gray-800 rounded">
-              <span className="text-gray-500">PRs</span>
-              <span className="font-medium">{contributionStats.pullRequests}</span>
-            </div>
-            <div className="flex justify-between items-center p-2 bg-gray-50 dark:bg-gray-800 rounded">
-              <span className="text-gray-500">Issues</span>
-              <span className="font-medium">{contributionStats.issues}</span>
-            </div>
-            <div className="flex justify-between items-center p-2 bg-gray-50 dark:bg-gray-800 rounded">
-              <span className="text-gray-500">Lines</span>
-              <span className="font-medium">+{contributionStats.additions} / -{contributionStats.deletions}</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-gray-50 dark:bg-gray-800 px-6 py-3 flex justify-between items-center">
-          <div>
-            <span className="block text-xs text-gray-500">Score</span>
-            <span className="font-bold text-lg" style={{ color: rarity.color }}>
-              {contributionScore}
-            </span>
-          </div>
-          <div className="flex items-center">
-            <div className="mr-2">
-              <span className="block text-xs text-gray-500">Rarity</span>
-              <span className="font-medium">{rarity.name}</span>
-            </div>
-            <div className="w-6 h-6 rounded-full" style={{ backgroundColor: rarity.color }}></div>
           </div>
         </div>
       </CardContent>
-      
-      <CardFooter className="border-t border-gray-100 dark:border-gray-700 p-4">
-        <Button 
-          onClick={onMint} 
-          disabled={isMinting} 
-          className="w-full bg-primary hover:bg-primary/90"
-        >
-          {isMinting ? (
-            <>
-              <Spinner size="sm" className="mr-2" />
-              Minting NFT...
-            </>
-          ) : (
-            <>
-              <i className="fas fa-award mr-2"></i>
-              Mint NFT
-            </>
-          )}
-        </Button>
-      </CardFooter>
     </Card>
   );
 } 
