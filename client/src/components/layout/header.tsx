@@ -157,7 +157,7 @@ export default function Header() {
     if (!isAuthenticated) {
       return {
         icon: <LinkIcon className="text-yellow-500" size={14} />,
-        text: "Complete Setup",
+        text: "Authenticate",
         action: () => setLocation("/setup"),
       };
     }

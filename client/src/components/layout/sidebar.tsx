@@ -247,8 +247,8 @@ export default function Sidebar() {
     if (isConnected && isGitHubAuthenticated && !isAuthenticated) {
       messages.push({
         icon: LinkIcon,
-        title: "Complete Setup",
-        description: "Finish setting up your account",
+        title: "Authenticate",
+        description: "Connect your wallet to DevCred",
         action: () => navigate("/setup"),
         type: "setup"
       });
