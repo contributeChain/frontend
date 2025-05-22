@@ -154,13 +154,6 @@ export default function Header() {
         action: () => setLocation("/link-github"),
       };
     }
-    if (!isAuthenticated) {
-      return {
-        icon: <LinkIcon className="text-yellow-500" size={14} />,
-        text: "Authenticate",
-        action: () => setLocation("/setup"),
-      };
-    }
     return null;
   };
 

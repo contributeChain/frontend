@@ -1,6 +1,6 @@
 import { Link } from "wouter";
 import { formatTimeAgo } from "@/lib/utils";
-import { type Repository, addRepositoryFollowActivity, getUserByWalletAddress, isFollowingRepository } from "@/lib/grove-service";
+import { type Repository, addRepositoryFollowActivity, getUserByWalletAddress, isFollowingRepository, hasUserMintedNFTForRepo } from "@/lib/grove-service";
 import { Button } from "@/components/ui/button";
 import { useAccount } from "wagmi";
 import { useState, useEffect } from "react";
@@ -19,6 +19,7 @@ export default function RepositoryCard({ repository, username, onRefresh }: Repo
   const { toast } = useToast();
   const [isFollowing, setIsFollowing] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [hasUserMinted, setHasUserMinted] = useState(false);
   
   // Check if user is already following this repository when component mounts
   useEffect(() => {
@@ -35,6 +36,23 @@ export default function RepositoryCard({ repository, username, onRefresh }: Repo
     };
     
     checkFollowingStatus();
+  }, [address, isConnected, repository.name, username]);
+  
+  // Check if user has already minted an NFT for this repository
+  useEffect(() => {
+    const checkUserMinted = async () => {
+      if (!isConnected || !address) return;
+      
+      try {
+        const repoFullName = `${username}/${repository.name}`;
+        const hasMinted = await hasUserMintedNFTForRepo(address, repoFullName);
+        setHasUserMinted(hasMinted);
+      } catch (error) {
+        console.error("Error checking if user has minted:", error);
+      }
+    };
+    
+    checkUserMinted();
   }, [address, isConnected, repository.name, username]);
   
   // Get repository icon based on the repository language or name
@@ -248,12 +266,21 @@ export default function RepositoryCard({ repository, username, onRefresh }: Repo
                 {isFollowing ? "Following" : "Follow"}
               </Button>
             )}
-            <Link href={`/mint-nft?repo=${username}/${repository.name}`}>
-              <a className="text-secondary hover:text-secondary/90 text-sm font-medium flex items-center gap-1">
-                <i className="fas fa-award text-xs"></i>
-                Mint NFT
-              </a>
-            </Link>
+            {isConnected && (
+              hasUserMinted ? (
+                <span className="text-secondary/60 text-xs flex items-center gap-1 px-2 py-1 bg-secondary/5 rounded-md">
+                  <i className="fas fa-check-circle text-xs"></i>
+                  Already Minted
+                </span>
+              ) : (
+                <Link href={`/mint-nft?repo=${username}/${repository.name}`}>
+                  <a className="text-secondary hover:text-secondary/90 text-sm font-medium flex items-center gap-1">
+                    <i className="fas fa-award text-xs"></i>
+                    Mint NFT
+                  </a>
+                </Link>
+              )
+            )}
             <Link href={`/repositories/${repository.id}`}>
               <a className="text-primary hover:text-primary/90 text-sm font-medium">View Details</a>
             </Link>
