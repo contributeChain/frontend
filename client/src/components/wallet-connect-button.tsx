@@ -1,20 +1,15 @@
-import { RainbowKitButton, CustomRainbowKitButton } from "./RainbowKitButton";
+import ConnectWalletButton from './ConnectWalletButton';
 
-interface WalletConnectButtonProps {
-  size?: 'sm' | 'md' | 'lg';
+type WalletConnectButtonProps = {
+  size?: 'sm' | 'default' | 'lg';
+  showBalance?: boolean;
   className?: string;
-}
+};
 
-export default function WalletConnectButton({ size = 'md', className }: WalletConnectButtonProps = {}) {
-  // Apply responsive size classes based on the size prop
-  const sizeClasses = {
-    sm: "text-xs py-1 px-3",
-    md: "text-sm py-2 px-4",
-    lg: "text-base py-2.5 px-5"
-  };
-
-  const combinedClasses = `${sizeClasses[size]} ${className || ''}`;
-  
-  // Now using RainbowKit instead of the temporary placeholder
-  return <CustomRainbowKitButton className={combinedClasses} />;
+export default function WalletConnectButton({
+  size = 'default',
+  showBalance = false,
+  className = ''
+}: WalletConnectButtonProps) {
+  return <ConnectWalletButton size={size} showBalance={showBalance} className={className} />;
 }

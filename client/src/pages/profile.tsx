@@ -8,7 +8,7 @@ import UserStats from "@/components/profile/user-stats";
 import FeaturedNFTs from "@/components/profile/featured-nfts";
 import RecentActivity from "@/components/profile/recent-activity";
 import { getUserProfile } from "@/lib/githubClient";
-import { getCurrentWalletAddress, shortenAddress } from "@/lib/web3-utils";
+import { shortenAddress } from "@/lib/web3-utils";
 import { 
   getUserByGitHubUsername, 
   getRepositoriesByUserId, 
@@ -21,7 +21,7 @@ import {
 } from "@/lib/grove-service";
 import { useAuth } from "@/hooks/use-auth";
 import WalletConnectButton from "@/components/wallet-connect-button";
-
+import { useAccount } from "wagmi";
 interface ProfileProps {
   username?: string | null;
 }
@@ -36,6 +36,7 @@ export default function Profile({ username }: ProfileProps) {
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const { user: authUser, isAuthenticated } = useAuth();
+  const { address } = useAccount();
   const [notFound, setNotFound] = useState(false);
   const [isFollowProcessing, setIsFollowProcessing] = useState(false);
 
@@ -46,8 +47,7 @@ export default function Profile({ username }: ProfileProps) {
       
       try {
         // Check wallet connection
-        const address = await getCurrentWalletAddress();
-        setWalletAddress(address);
+        setWalletAddress(address ?? null);
         
         if (username) {
           await loadUserByGitHubUsername(username);
@@ -108,7 +108,7 @@ export default function Profile({ username }: ProfileProps) {
         setRepositories(reposData);
         
         // Check if the current user is following this profile
-        const currentAddress = await getCurrentWalletAddress();
+        const currentAddress = address;
         if (currentAddress && userData.id) {
           const following = await isFollowingUser(currentAddress, userData.id);
           setIsFollowing(following);
@@ -138,7 +138,6 @@ export default function Profile({ username }: ProfileProps) {
         setUser(placeholderUser);
         
         // If we're authenticated, we could save this user to Grove
-        const address = await getCurrentWalletAddress();
         if (isAuthenticated && address && address.startsWith('0x')) {
           console.log('Saving GitHub user to Grove collection');
           await addUserToCollection(placeholderUser, address as `0x${string}`);

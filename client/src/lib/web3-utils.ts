@@ -1,12 +1,5 @@
 import { ethers } from "ethers";
 
-// Add Ethereum to window type
-declare global {
-  interface Window {
-    ethereum?: any; // Use 'any' to avoid type conflicts with different metamask versions
-  }
-}
-
 // Define the interface for a simple NFT
 export interface NFT {
   id: number;
@@ -30,54 +23,24 @@ export function shortenAddress(address: string, chars = 4): string {
   return `${start}...${end}`;
 }
 
-// Mock wallet connection function
+// Note: These functions should be replaced with direct usage of wagmi hooks in components
+// These are kept for backward compatibility
+
+// Connect wallet function - use wagmi's useConnect hook in components instead
 export async function connectWallet(): Promise<string | null> {
-  // Check if window.ethereum is available
-  if (typeof window.ethereum !== 'undefined') {
-    try {
-      // Request account access
-      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-      
-      if (accounts.length > 0) {
-        return accounts[0];
-      }
-    } catch (error) {
-      console.error('Error connecting to wallet:', error);
-    }
-  } else {
-    console.error('No Ethereum provider detected. Please install MetaMask or another wallet.');
-  }
-  
+  console.warn('connectWallet in web3-utils is deprecated. Use wagmi useConnect hook instead');
   return null;
 }
 
-// Check wallet connection status
+// Check wallet connection status - use wagmi's useAccount hook instead
 export async function isWalletConnected(): Promise<boolean> {
-  if (typeof window.ethereum !== 'undefined') {
-    try {
-      const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-      return accounts.length > 0;
-    } catch (error) {
-      console.error('Error checking wallet connection:', error);
-    }
-  }
-  
+  console.warn('isWalletConnected in web3-utils is deprecated. Use wagmi useAccount hook instead');
   return false;
 }
 
-// Get current wallet address
+// Get current wallet address - use wagmi's useAccount hook instead
 export async function getCurrentWalletAddress(): Promise<string | null> {
-  if (typeof window.ethereum !== 'undefined') {
-    try {
-      const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-      if (accounts.length > 0) {
-        return accounts[0];
-      }
-    } catch (error) {
-      console.error('Error getting wallet address:', error);
-    }
-  }
-  
+  console.warn('getCurrentWalletAddress in web3-utils is deprecated. Use wagmi useAccount hook instead');
   return null;
 }
 

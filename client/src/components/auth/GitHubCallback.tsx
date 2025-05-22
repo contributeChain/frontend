@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
 import { useAccount } from 'wagmi';
+import ConnectWalletButton from '@/components/ConnectWalletButton';
 
 export function GitHubCallback() {
   const [isProcessing, setIsProcessing] = useState(true);
@@ -14,6 +15,8 @@ export function GitHubCallback() {
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
   const { address, isConnected } = useAccount();
+  const [walletChecked, setWalletChecked] = useState(false);
+  const [connectionStateDebug, setConnectionStateDebug] = useState<any>({});
   
   // Use Zustand stores instead of context
   const updateUserWithGitHub = useAuthStore((state) => state.updateUserWithGitHub);
@@ -21,7 +24,29 @@ export function GitHubCallback() {
   
   const hasProcessedCode = useRef(false);
   
+  // Add a separate effect to check wallet connection with a delay
   useEffect(() => {
+    // Allow more time for ConnectKit to initialize the wallet connection
+    const timer = setTimeout(() => {
+      // Log connection state for debugging
+      const debugState = {
+        isConnected,
+        address,
+        hasAddress: !!address,
+        timestamp: new Date().toISOString()
+      };
+      setConnectionStateDebug(debugState);
+      console.log("Wallet connection state:", debugState);
+      setWalletChecked(true);
+    }, 2000); // Increased to 2 seconds for more reliable connection
+    
+    return () => clearTimeout(timer);
+  }, [isConnected, address]);
+  
+  useEffect(() => {
+    // Only proceed when wallet check is complete
+    if (!walletChecked) return;
+    
     const handleGitHubCallback = async () => {
       // Prevent duplicated processing
       if (hasProcessedCode.current) return;
@@ -49,8 +74,19 @@ export function GitHubCallback() {
         return;
       }
       
-      if (!isConnected || !address) {
+      // Check for wallet connection - either isConnected flag OR presence of address
+      const walletConnected = isConnected || !!address;
+      
+      if (!walletConnected) {
+        console.error('Wallet connection required:', { isConnected, address, connectionStateDebug });
         setError('Wallet connection required. Please connect your wallet first.');
+        setIsProcessing(false);
+        return;
+      }
+      
+      if (!address) {
+        console.error('No wallet address found despite connection status:', { isConnected, connectionStateDebug });
+        setError('Could not determine your wallet address. Please try reconnecting your wallet.');
         setIsProcessing(false);
         return;
       }
@@ -85,7 +121,7 @@ export function GitHubCallback() {
         
         // Use a slight delay to ensure state updates complete
         setTimeout(() => {
-        setLocation(redirectPath);
+          setLocation(redirectPath);
         }, 100);
       } catch (error) {
         console.error('Error processing GitHub callback:', error);
@@ -98,13 +134,21 @@ export function GitHubCallback() {
     if (!hasProcessedCode.current) {
       handleGitHubCallback();
     }
-  }, [isConnected, address, updateUserWithGitHub, githubLogin, setLocation, toast]);
+  }, [isConnected, address, updateUserWithGitHub, githubLogin, setLocation, toast, walletChecked, connectionStateDebug]);
   
   const handleRetry = () => {
-    setLocation('/github/link');
+    hasProcessedCode.current = false; // Reset processing state
+    setIsProcessing(true); // Reset UI state
+    setError(null); // Clear errors
+    setWalletChecked(false); // Reset wallet check
+    
+    // Force a new wallet check
+    setTimeout(() => {
+      setWalletChecked(true);
+    }, 1000);
   };
   
-  if (isProcessing) {
+  if (isProcessing && !error) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] p-4">
         <Card className="w-full max-w-md">
@@ -124,6 +168,9 @@ export function GitHubCallback() {
   }
 
   if (error) {
+    const isWalletError = error.includes('Wallet connection required') || 
+                         error.includes('wallet address');
+    
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] p-4">
         <Card className="w-full max-w-md border-destructive">
@@ -134,13 +181,35 @@ export function GitHubCallback() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="bg-destructive/10 p-4 rounded-md">
+            <div className="bg-destructive/10 p-4 rounded-md mb-4">
               <p className="text-sm text-destructive">{error}</p>
             </div>
+            
+            {isWalletError && (
+              <div className="flex flex-col items-center p-4 border border-dashed border-gray-300 dark:border-gray-700 rounded-md mb-4">
+                <p className="mb-4 text-sm text-center">Please connect your wallet first:</p>
+                <ConnectWalletButton />
+                {address && (
+                  <div className="mt-4 p-3 bg-green-100 dark:bg-green-900/20 rounded-md w-full">
+                    <p className="text-xs text-center text-green-700 dark:text-green-400">
+                      Address detected: {address.slice(0, 6)}...{address.slice(-4)}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+            
+            <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+              <p>Connection state: {isConnected ? 'Connected' : 'Not connected'}</p>
+              {address && <p>Address: {address.slice(0, 6)}...{address.slice(-4)}</p>}
+            </div>
           </CardContent>
-          <CardFooter>
+          <CardFooter className="flex flex-col space-y-2">
             <Button onClick={handleRetry} className="w-full">
               Try Again
+            </Button>
+            <Button variant="outline" onClick={() => setLocation('/')} className="w-full">
+              Go to Home
             </Button>
           </CardFooter>
         </Card>

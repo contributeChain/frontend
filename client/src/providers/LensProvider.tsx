@@ -1,7 +1,7 @@
-import { ReactNode, createContext, useState, useEffect, useRef, useCallback, useContext } from 'react';
+import { ReactNode, createContext, useState, useEffect, useRef, useContext } from 'react';
 import { useAccount, useWalletClient } from 'wagmi';
 import { useToast } from '@/hooks/use-toast';
-import {  lensClient } from '@/lib/lensClient';
+import { lensClient } from '@/lib/lensClient';
 import { useLensStore } from '@/store';
 
 // Define the LensSession type locally since it's not exported
@@ -22,7 +22,7 @@ export type LensContextType = {
 
 export const LensContext = createContext<LensContextType>({
   isAuthenticated: false,
-  authenticate: async (address: string, walletClient: any) => false,
+  authenticate: async () => false,
   logout: async () => {},
   hasProfile: null,
   isLoading: false,
@@ -32,7 +32,7 @@ export const LensContext = createContext<LensContextType>({
 // Hook to use the Lens context
 export const useLens = () => useContext(LensContext);
 
-export default function LensProvider({ children }: { children: ReactNode }) {
+function LensProvider({ children }: { children: ReactNode }) {
   // Get state and methods from Zustand store
   const {
     hasProfile: storeHasProfile,
@@ -99,11 +99,10 @@ export default function LensProvider({ children }: { children: ReactNode }) {
       });
       return false;
     }
-    console.log('walletClient authenticate', walletClient);
+    
     const success = await storeAuthenticate(address, walletClient);
-    console.log('walletClient authenticate success', success);
+    
     if (success) {
-      // Try to get the session client
       try {
         const resumed = await lensClient.resumeSession();
         if (resumed.isOk()) {
@@ -154,4 +153,6 @@ export default function LensProvider({ children }: { children: ReactNode }) {
       {children}
     </LensContext.Provider>
   );
-} 
+}
+
+export default LensProvider; 
