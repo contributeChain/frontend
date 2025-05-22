@@ -65,7 +65,7 @@ interface NftBackgroundChangerProps {
 
 export default function NftBackgroundChanger({
   repositoryName,
-  contributorName,
+  contributorName = "aviation",
   contributionScore,
   rarityTier,
   onImageGenerated,
@@ -217,54 +217,106 @@ export default function NftBackgroundChanger({
     ctx.fillRect(0, 0, width, height);
   };
   
+  // Create a profile circle
+  const drawProfileCircle = (ctx: CanvasRenderingContext2D) => {
+    const { width, height } = canvasSize;
+    const centerX = width / 2;
+    const centerY = height / 2;
+    const radius = width / 6;
+    
+    // Draw circle
+    ctx.fillStyle = '#E2E8F0';
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Draw initials
+    const initials = contributorName.substring(0, 2).toUpperCase();
+    ctx.fillStyle = '#1A202C';
+    ctx.font = `bold ${radius}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(initials, centerX, centerY);
+  };
+  
   // Draw text information
   const drawText = (ctx: CanvasRenderingContext2D) => {
     const { width, height } = canvasSize;
-    const fontSize = width / 25;
-    const smallFontSize = width / 31.25;
+    const fontSize = width / 18;
+    const smallFontSize = width / 26;
     
-    // Repository name
+    // Repository name at top (like 'AgentMintFrontend')
     ctx.fillStyle = '#ffffff';
-    ctx.font = `${fontSize}px sans-serif`;
+    ctx.font = `bold ${fontSize}px sans-serif`;
     ctx.textAlign = 'center';
-    ctx.fillText(repositoryName, width / 2, height / 10);
+    ctx.fillText(repositoryName.split('/')[1] || repositoryName, width / 2, height / 7);
     
-    // Contributor name
+    // Contributor name below profile circle
     ctx.font = `${smallFontSize}px sans-serif`;
-    ctx.fillText(`Contributor: ${contributorName}`, width / 2, height / 6);
+    ctx.fillText("Blockchain Oracle", width / 2, height / 1.6);
     
-    // Stats
-    const statY = height - height / 4;
-    const statSpacing = width / 5;
-    
+    // Contribution Score
     ctx.font = `${smallFontSize}px sans-serif`;
-    ctx.textAlign = 'center';
+    ctx.fillText(`Contribution Score: ${contributionScore}`, width / 2, height / 1.4);
     
-    // Score
-    ctx.fillText(`Score: ${contributionScore}`, width / 2, statY);
+    // Generated date at bottom
+    const today = new Date();
+    const formattedDate = `${today.getDate().toString().padStart(2, '0')}/${(today.getMonth() + 1).toString().padStart(2, '0')}/${today.getFullYear()}`;
+    ctx.font = `${smallFontSize * 0.8}px sans-serif`;
+    ctx.fillText(`Generated on ${formattedDate}`, width / 2, height / 1.15);
     
-    // Commits & PRs
-    ctx.fillText(`Commits: ${contributionStats.commits}`, width / 2 - statSpacing, statY + smallFontSize * 1.5);
-    ctx.fillText(`PRs: ${contributionStats.pullRequests}`, width / 2 + statSpacing, statY + smallFontSize * 1.5);
+    // Draw border
+    const borderWidth = width * 0.03;
+    const cornerRadius = width * 0.05;
     
-    // Additions & Deletions
-    ctx.fillText(`+${contributionStats.additions}`, width / 2 - statSpacing, statY + smallFontSize * 3);
-    ctx.fillText(`-${contributionStats.deletions}`, width / 2 + statSpacing, statY + smallFontSize * 3);
+    // Draw rounded rectangle border
+    ctx.strokeStyle = rarityTier.color;
+    ctx.lineWidth = borderWidth;
     
-    // Rarity badge
-    const badgeWidth = width / 4;
-    const badgeHeight = height / 16;
-    const badgeX = width - badgeWidth - width / 50;
-    const badgeY = height / 50;
-    
+    // Top rarity bar
     ctx.fillStyle = rarityTier.color;
-    ctx.fillRect(badgeX, badgeY, badgeWidth, badgeHeight);
+    const barHeight = height * 0.1;
+    roundRect(ctx, width * 0.07, height * 0.2, width * 0.86, barHeight, cornerRadius, true, false);
     
+    // Draw rarity text
     ctx.fillStyle = '#ffffff';
     ctx.font = `bold ${smallFontSize}px sans-serif`;
     ctx.textAlign = 'center';
-    ctx.fillText(rarityTier.name, badgeX + badgeWidth / 2, badgeY + badgeHeight / 2 + smallFontSize / 3);
+    ctx.fillText(`${rarityTier.name} - SCORE: ${contributionScore}`, width / 2, height * 0.2 + barHeight / 2 + smallFontSize / 3);
+    
+    // Draw outer border
+    roundRect(ctx, width * 0.07, height * 0.07, width * 0.86, height * 0.86, cornerRadius, false, true);
   };
+  
+  // Helper function for drawing rounded rectangles
+  function roundRect(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    radius: number,
+    fill: boolean,
+    stroke: boolean
+  ) {
+    ctx.beginPath();
+    ctx.moveTo(x + radius, y);
+    ctx.lineTo(x + width - radius, y);
+    ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+    ctx.lineTo(x + width, y + height - radius);
+    ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+    ctx.lineTo(x + radius, y + height);
+    ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+    ctx.lineTo(x, y + radius);
+    ctx.quadraticCurveTo(x, y, x + radius, y);
+    ctx.closePath();
+    if (fill) {
+      ctx.fill();
+    }
+    if (stroke) {
+      ctx.stroke();
+    }
+  }
   
   // Main function to draw the entire canvas
   const drawCanvas = async () => {
@@ -288,6 +340,9 @@ export default function NftBackgroundChanger({
     } else if (bgTemplate.type === 'pattern') {
       drawPattern(ctx, bgTemplate.patternType, bgTemplate.colors);
     }
+    
+    // Draw profile circle
+    drawProfileCircle(ctx);
     
     // Draw text information with stats
     drawText(ctx);
@@ -326,8 +381,15 @@ export default function NftBackgroundChanger({
     }
   };
   
+  // Convert canvas to base64 data URL
+  const getDataUrl = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return '';
+    return canvas.toDataURL('image/png');
+  };
+  
   return (
-    <div className="absolute inset-0 bg-black/80 z-10 flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black/80 z-10 flex items-center justify-center p-4">
       <div className="bg-white dark:bg-gray-900 rounded-lg p-4 max-w-lg w-full">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-medium">Change Background</h3>

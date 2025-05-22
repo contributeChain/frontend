@@ -168,7 +168,7 @@ export function NftPreviewCard({
                     Processing...
                   </>
                 ) : (
-                  customImageUrl ? 'Mint Custom NFT' : 'Mint Default NFT'
+                  customImageUrl ? 'Mint NFT' : 'Mint Default NFT'
                 )}
               </Button>
             )}
