@@ -29,12 +29,8 @@ const projectId = import.meta.env.VITE_WALLET_CONNECT_PROJECT_ID || "095afbef7b1
 const config = createConfig(
   getDefaultConfig({
     appName: 'Lens Alchemy',
-    chains: [mainnet, polygon, base, zora, lens, lensTestnet],
+    chains: [lens, lensTestnet],
     transports: {
-      [mainnet.id]: http(),
-      [polygon.id]: http(),
-      [base.id]: http(),
-      [zora.id]: http(),
       [lens.id]: http(),
       [lensTestnet.id]: http(),
     },
