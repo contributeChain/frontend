@@ -1,5 +1,4 @@
-// @ts-ignore
-import groveUris from "../config/grove-uris.json";
+
 import { storageClient } from "./groveClient";
 import { createLensAccountACL, updateJson } from "./groveClient";
 
@@ -74,18 +73,86 @@ const isCacheValid = (key: string): boolean => {
   return !!timestamp && (Date.now() - timestamp < CACHE_TTL);
 };
 
+// Grove URIs state and initialization
+type GroveUris = {
+  users: string;
+  repositories: string;
+  nfts: string;
+  activities: string;
+  posts: string;
+  uploadedAt: string;
+};
+
+let groveUris: GroveUris = {
+  users: "",
+  repositories: "",
+  nfts: "",
+  activities: "",
+  posts: "",
+  uploadedAt: new Date().toISOString()
+};
+
+let groveUrisPromise: Promise<GroveUris> | null = null;
+let groveUrisLoaded = false;
+
 /**
+ * Loads Grove URIs from the server if not already loaded.
+ * Returns the current Grove URIs object.
+ */
+async function getGroveUris(): Promise<GroveUris> {
+  if (groveUrisLoaded) {
+    return groveUris;
+  }
+  if (!groveUrisPromise) {
+    groveUrisPromise = (async () => {
+      try {
+        const response = await fetch('/api/grove/uris');
+        if (!response.ok) {
+          throw new Error(`Failed to fetch Grove URIs: ${response.status} ${response.statusText}`);
+        }
+        const data = await response.json();
+        groveUris = data as GroveUris;
+        groveUrisLoaded = true;
+        return groveUris;
+      } catch (error) {
+        console.error("Error fetching Grove URIs:", error);
+        // Return default values if fetch fails
+        groveUris = {
+          users: "",
+          repositories: "",
+          nfts: "",
+          activities: "",
+          posts: "",
+          uploadedAt: new Date().toISOString()
+        };
+        groveUrisLoaded = true;
+        return groveUris;
+      }
+    })();
+  }
+  return groveUrisPromise;
+}
+
+/**
+ * Helper to get the latest Grove URI for a given key.
+ */
+async function getGroveUriByKey<K extends keyof GroveUris>(key: K): Promise<string> {
+  const uris = await getGroveUris();
+  return uris[key];
+}
+
+/**a
  * Fetches data from Grove storage using the specified URI
  */
 async function fetchFromGrove<T>(uri: string): Promise<T> {
   try {
     console.log('Fetching from Grove:', uri);
-    
+
     // Check cache first
     if (cache[uri] && isCacheValid(uri)) {
       return cache[uri] as T;
     }
-    
+
     // Resolve lens:// URI to a web URL
     let resolvedUrl: string;
     if (uri.startsWith('lens://')) {
@@ -95,21 +162,21 @@ async function fetchFromGrove<T>(uri: string): Promise<T> {
     } else {
       resolvedUrl = uri;
     }
-    
+
     // Fetch data from Grove
     const response = await fetch(resolvedUrl);
     console.log('Response:', response);
     if (!response.ok) {
       throw new Error(`Failed to fetch data: ${response.status} ${response.statusText}`);
     }
-    
+
     const data = await response.json() as T;
     console.log('Data:', data);
-    
+
     // Update cache
     cache[uri] = data;
     cacheTimestamps[uri] = Date.now();
-    
+
     return data;
   } catch (error) {
     console.error(`Error fetching data from Grove (${uri}):`, error);
@@ -122,8 +189,9 @@ async function fetchFromGrove<T>(uri: string): Promise<T> {
  */
 export async function fetchUsers(): Promise<User[]> {
   try {
-    const data = await fetchFromGrove<any>(groveUris.users);
-    
+    const usersUri = await getGroveUriByKey('users');
+    const data = await fetchFromGrove<any>(usersUri);
+
     // Validate data structure 
     if (!data || !Array.isArray(data.users)) {
       console.warn('Invalid data format for users:', data);
@@ -131,7 +199,7 @@ export async function fetchUsers(): Promise<User[]> {
     }
 
     console.log('Users:', data.users);
-    
+
     return data.users.map((user: any) => ({
       ...user,
       createdAt: user.createdAt ? new Date(user.createdAt as unknown as string) : null
@@ -163,14 +231,15 @@ export async function fetchTrendingDevelopers(limit: number = 5): Promise<User[]
  */
 export async function fetchRepositories(): Promise<Repository[]> {
   try {
-    const data = await fetchFromGrove<any>(groveUris.repositories);
-    
+    const repositoriesUri = await getGroveUriByKey('repositories');
+    const data = await fetchFromGrove<any>(repositoriesUri);
+
     // Validate data structure
     if (!data || !Array.isArray(data.repositories)) {
       console.warn('Invalid data format for repositories:', data);
       return []; // Return empty array instead of throwing
     }
-    
+
     return data.repositories.map(formatRepository);
   } catch (error) {
     console.error("Error fetching repositories:", error);
@@ -200,14 +269,15 @@ function formatRepository(repo: any): Repository {
  */
 export async function fetchNFTs(): Promise<NFT[]> {
   try {
-    const data = await fetchFromGrove<any>(groveUris.nfts);
-    
+    const nftsUri = await getGroveUriByKey('nfts');
+    const data = await fetchFromGrove<any>(nftsUri);
+
     // Validate data structure
     if (!data || !Array.isArray(data.nfts)) {
       console.warn('Invalid data format for NFTs:', data);
       return []; // Return empty array instead of throwing
     }
-    
+
     return data.nfts.map((nft: any) => ({
       ...nft,
       mintedAt: new Date(nft.mintedAt as unknown as string)
@@ -223,14 +293,15 @@ export async function fetchNFTs(): Promise<NFT[]> {
  */
 export async function fetchActivities(): Promise<Activity[]> {
   try {
-    const data = await fetchFromGrove<any>(groveUris.activities);
-    
+    const activitiesUri = await getGroveUriByKey('activities');
+    const data = await fetchFromGrove<any>(activitiesUri);
+
     // Validate data structure
     if (!data || !Array.isArray(data.activities)) {
       console.warn('Invalid data format for activities:', data);
       return []; // Return empty array instead of throwing
     }
-    
+
     return data.activities.map((activity: any) => ({
       ...activity,
       activity: {
@@ -255,7 +326,7 @@ export async function searchUsers(query: string): Promise<User[]> {
   try {
     const users = await fetchUsers();
     const lowerQuery = query.toLowerCase();
-    
+
     return users.filter(user => 
       user.username.toLowerCase().includes(lowerQuery) || 
       (user.githubUsername && user.githubUsername.toLowerCase().includes(lowerQuery))
@@ -340,18 +411,18 @@ export async function getActivitiesByUserId(userId: number): Promise<Activity[]>
  * @param key The key in the grove-uris.json file to update (e.g., 'repositories', 'nfts')
  * @param newUri The new URI to save
  */
-export async function updateGroveUri(key: keyof typeof groveUris, newUri: string): Promise<boolean> {
+export async function updateGroveUri(key: keyof GroveUris, newUri: string): Promise<boolean> {
   try {
-    console.log(`Updating Grove URI for ${key} to ${newUri}`);
-    
-    if (groveUris[key] === newUri) {
-      console.log(`URI for ${key} is already set to ${newUri}, skipping update`);
+    const uris = await getGroveUris();
+    console.log(`Updating Grove URI for ${String(key)} to ${newUri}`);
+    if (uris[key] === newUri) {
+      console.log(`URI for ${String(key)} is already set to ${newUri}, skipping update`);
       return true;
     }
-    
+
     // Update the URI in memory
-    groveUris[key] = newUri;
-    
+    uris[key] = newUri;
+
     // Call the API to update the file on the server
     const response = await fetch('/api/grove/uri', {
       method: 'POST',
@@ -360,22 +431,22 @@ export async function updateGroveUri(key: keyof typeof groveUris, newUri: string
       },
       body: JSON.stringify({ key, uri: newUri }),
     });
-    
+
     if (!response.ok) {
       const errorData = await response.json();
       console.error(`API error updating Grove URI: ${response.status}`, errorData);
       return false;
     }
-    
+
     const result = await response.json();
     console.log(`API updated Grove URI: ${result.message}`);
-    
+
     // Invalidate all Grove cache entries to ensure fresh data everywhere
     invalidateAllGroveCache();
-    
+
     return true;
   } catch (error) {
-    console.error(`Error updating Grove URI for ${key}:`, error);
+    console.error(`Error updating Grove URI for ${String(key)}:`, error);
     return false;
   }
 }
@@ -388,42 +459,43 @@ export async function updateGroveUri(key: keyof typeof groveUris, newUri: string
 export async function addNFTToCollection(newNft: NFT, walletAddress: `0x${string}`): Promise<boolean> {
   try {
     console.log('Adding NFT to collection:', newNft);
-    
+
+    const nftsUri = await getGroveUriByKey('nfts');
     // 1. Fetch current NFTs collection
-    const data = await fetchFromGrove<any>(groveUris.nfts);
-    
+    const data = await fetchFromGrove<any>(nftsUri);
+
     // Validate data structure
     if (!data || !Array.isArray(data.nfts)) {
       console.warn('Invalid data format for NFTs:', data);
       return false;
     }
-    
+
     const nfts = data.nfts;
-    
+
     // 2. Add the new NFT to the collection
     nfts.push(newNft);
     console.log('Updated NFT collection:', nfts);
-    
+
     // 3. Upload the updated collection back to Grove
     const updatedData = { nfts };
-    
+
     // Use updateJson to update the existing URI
     const response = await updateJson(
-      groveUris.nfts,
+      nftsUri,
       updatedData,
       walletAddress
     );
-    
+
     console.log('Updated NFTs collection:', response);
-    
+
     // Update the URI in the config if it changed
-    if (response.uri !== groveUris.nfts) {
+    if (response.uri !== nftsUri) {
       await updateGroveUri('nfts', response.uri);
     }
-    
+
     // Invalidate all Grove cache entries to ensure fresh data everywhere
     invalidateAllGroveCache();
-    
+
     return true;
   } catch (error) {
     console.error('Error adding NFT to collection:', error);
@@ -439,43 +511,44 @@ export async function addNFTToCollection(newNft: NFT, walletAddress: `0x${string
 export async function addRepositoryToCollection(newRepo: Repository, walletAddress: `0x${string}`): Promise<boolean> {
   try {
     console.log('Adding repository to collection:', newRepo);
-    
+
+    const repositoriesUri = await getGroveUriByKey('repositories');
     // 1. Fetch current repositories collection
-    const data = await fetchFromGrove<any>(groveUris.repositories);
-    
+    const data = await fetchFromGrove<any>(repositoriesUri);
+
     // Validate data structure
     if (!data || !Array.isArray(data.repositories)) {
       console.warn('Invalid data format for repositories:', data);
       return false;
     }
-    
+
     const repositories = data.repositories;
-    
+
     // 2. Add the new repository to the collection
     repositories.push(newRepo);
     console.log('Updated repositories collection:', repositories);
-    
+
     // 3. Upload the updated collection back to Grove
     const updatedData = { repositories };
-    
+
     // Use updateJson to update the existing URI
     const response = await updateJson(
-      groveUris.repositories,
+      repositoriesUri,
       updatedData,
       walletAddress
     );
-    
+
     console.log('Updated repositories collection:', response);
-    
+
     // Update the URI in the config if it changed
-    if (response.uri !== groveUris.repositories) {
+    if (response.uri !== repositoriesUri) {
       await updateGroveUri('repositories', response.uri);
     }
-    
+
     // Clear cache for the repositories URI to ensure fresh data on next fetch
-    delete cache[groveUris.repositories];
-    delete cacheTimestamps[groveUris.repositories];
-    
+    delete cache[repositoriesUri];
+    delete cacheTimestamps[repositoriesUri];
+
     return true;
   } catch (error) {
     console.error('Error adding repository to collection:', error);
@@ -491,24 +564,25 @@ export async function addRepositoryToCollection(newRepo: Repository, walletAddre
 export async function addUserToCollection(userData: Partial<User>, walletAddress: `0x${string}`): Promise<boolean> {
   try {
     console.log('Adding/updating user in collection:', userData);
-    
+
+    const usersUri = await getGroveUriByKey('users');
     // 1. Fetch current users collection
-    const data = await fetchFromGrove<any>(groveUris.users);
-    
+    const data = await fetchFromGrove<any>(usersUri);
+
     // Validate data structure
     if (!data || !Array.isArray(data.users)) {
       console.warn('Invalid data format for users:', data);
       return false;
     }
-    
+
     const users = data.users;
-    
+
     // 2. Check if user already exists (by wallet address or GitHub username)
     const existingUserIndex = users.findIndex((user: User) => 
       (userData.walletAddress && user.walletAddress === userData.walletAddress) || 
       (userData.githubUsername && user.githubUsername === userData.githubUsername)
     );
-    
+
     if (existingUserIndex >= 0) {
       // Update existing user
       users[existingUserIndex] = {
@@ -538,28 +612,28 @@ export async function addUserToCollection(userData: Partial<User>, walletAddress
       users.push(newUser);
       console.log('Added new user:', newUser);
     }
-    
+
     // 3. Upload the updated collection back to Grove
     const updatedData = { users };
-    
+
     // Use updateJson to update the existing URI
     const response = await updateJson(
-      groveUris.users,
+      usersUri,
       updatedData,
       walletAddress
     );
-    
+
     console.log('Updated users collection:', response);
-    
+
     // Update the URI in the config if it changed
-    if (response.uri !== groveUris.users) {
+    if (response.uri !== usersUri) {
       await updateGroveUri('users', response.uri);
     }
-    
+
     // Clear cache for the users URI to ensure fresh data on next fetch
-    delete cache[groveUris.users];
-    delete cacheTimestamps[groveUris.users];
-    
+    delete cache[usersUri];
+    delete cacheTimestamps[usersUri];
+
     return true;
   } catch (error) {
     console.error('Error adding/updating user in collection:', error);
@@ -608,52 +682,53 @@ export async function getUserByWalletAddress(walletAddress: string): Promise<Use
 export async function updateRepositoryNftCount(repoName: string, walletAddress: `0x${string}`): Promise<boolean> {
   try {
     console.log(`Updating NFT count for repository: ${repoName}`);
-    
+
+    const repositoriesUri = await getGroveUriByKey('repositories');
     // 1. Fetch current repositories collection
-    const data = await fetchFromGrove<any>(groveUris.repositories);
-    
+    const data = await fetchFromGrove<any>(repositoriesUri);
+
     // Validate data structure
     if (!data || !Array.isArray(data.repositories)) {
       console.warn('Invalid data format for repositories:', data);
       return false;
     }
-    
+
     const repositories = data.repositories;
-    
+
     // 2. Find the repository by name
     const repoIndex = repositories.findIndex((repo: Repository) => repo.name === repoName);
-    
+
     if (repoIndex === -1) {
       console.warn(`Repository "${repoName}" not found in collection`);
       return false;
     }
-    
+
     // 3. Increment the NFT count
     repositories[repoIndex].nftCount = (repositories[repoIndex].nftCount || 0) + 1;
     repositories[repoIndex].lastUpdated = new Date();
-    
+
     console.log(`Updated repository NFT count: ${repositories[repoIndex].nftCount}`);
-    
+
     // 4. Upload the updated collection back to Grove
     const updatedData = { repositories };
-    
+
     // Use updateJson to update the existing URI
     const response = await updateJson(
-      groveUris.repositories,
+      repositoriesUri,
       updatedData,
       walletAddress
     );
-    
+
     console.log('Updated repositories collection:', response);
-    
+
     // Update the URI in the config if it changed
-    if (response.uri !== groveUris.repositories) {
+    if (response.uri !== repositoriesUri) {
       await updateGroveUri('repositories', response.uri);
     }
-    
+
     // Invalidate all Grove cache entries to ensure fresh data everywhere
     invalidateAllGroveCache();
-    
+
     return true;
   } catch (error) {
     console.error(`Error updating NFT count for repository "${repoName}":`, error);
@@ -669,59 +744,60 @@ export async function updateRepositoryNftCount(repoName: string, walletAddress: 
 export async function updateUserAfterMinting(walletAddress: `0x${string}`): Promise<boolean> {
   try {
     console.log(`Updating user information after minting for wallet: ${walletAddress}`);
-    
+
     // 1. Get user by wallet address
     const user = await getUserByWalletAddress(walletAddress);
-    
+
     if (!user) {
       console.warn(`User with wallet address "${walletAddress}" not found`);
       return false;
     }
-    
+
+    const usersUri = await getGroveUriByKey('users');
     // 2. Fetch current users collection
-    const data = await fetchFromGrove<any>(groveUris.users);
-    
+    const data = await fetchFromGrove<any>(usersUri);
+
     // Validate data structure
     if (!data || !Array.isArray(data.users)) {
       console.warn('Invalid data format for users:', data);
       return false;
     }
-    
+
     const users = data.users;
-    
+
     // 3. Find the user in the collection
     const userIndex = users.findIndex((u: any) => u.walletAddress === walletAddress);
-    
+
     if (userIndex === -1) {
       console.warn(`User with wallet address "${walletAddress}" not found in collection`);
       return false;
     }
-    
+
     // 4. Update the user's reputation
     users[userIndex].reputation = (users[userIndex].reputation || 0) + 10; // Add 10 reputation points for minting an NFT
-    
+
     console.log(`Updated user reputation: ${users[userIndex].reputation}`);
-    
+
     // 5. Upload the updated collection back to Grove
     const updatedData = { users };
-    
+
     // Use updateJson to update the existing URI
     const response = await updateJson(
-      groveUris.users,
+      usersUri,
       updatedData,
       walletAddress
     );
-    
+
     console.log('Updated users collection:', response);
-    
+
     // Update the URI in the config if it changed
-    if (response.uri !== groveUris.users) {
+    if (response.uri !== usersUri) {
       await updateGroveUri('users', response.uri);
     }
-    
+
     // Invalidate all Grove cache entries to ensure fresh data everywhere
     invalidateAllGroveCache();
-    
+
     return true;
   } catch (error) {
     console.error(`Error updating user information after minting for wallet "${walletAddress}":`, error);
@@ -755,18 +831,19 @@ export async function addActivityToCollection(
 ): Promise<boolean> {
   try {
     console.log('Adding activity to collection:', activityData);
-    
+
+    const activitiesUri = await getGroveUriByKey('activities');
     // 1. Fetch current activities collection
-    const data = await fetchFromGrove<any>(groveUris.activities);
-    
+    const data = await fetchFromGrove<any>(activitiesUri);
+
     // Validate data structure
     if (!data || !Array.isArray(data.activities)) {
       console.warn('Invalid data format for activities:', data);
       return false;
     }
-    
+
     const activities = data.activities;
-    
+
     // 2. Create new activity object
     const newActivity = {
       activity: {
@@ -780,32 +857,32 @@ export async function addActivityToCollection(
       },
       user: userData
     };
-    
+
     // 3. Add the new activity to the collection
     activities.push(newActivity);
-    
+
     console.log('Updated activities collection with new activity:', newActivity);
-    
+
     // 4. Upload the updated collection back to Grove
     const updatedData = { activities };
-    
+
     // Use updateJson to update the existing URI
     const response = await updateJson(
-      groveUris.activities,
+      activitiesUri,
       updatedData,
       walletAddress
     );
-    
+
     console.log('Updated activities collection:', response);
-    
+
     // Update the URI in the config if it changed
-    if (response.uri !== groveUris.activities) {
+    if (response.uri !== activitiesUri) {
       await updateGroveUri('activities', response.uri);
     }
-    
+
     // Invalidate all Grove cache entries to ensure fresh data everywhere
     invalidateAllGroveCache();
-    
+
     return true;
   } catch (error) {
     console.error('Error adding activity to collection:', error);
@@ -819,7 +896,7 @@ export async function addActivityToCollection(
  */
 export function invalidateAllGroveCache(): void {
   console.log('Invalidating all Grove cache entries');
-  
+
   // Get all URIs from the groveUris object
   Object.values(groveUris).forEach(uri => {
     // Skip non-string values like timestamps
@@ -845,7 +922,7 @@ export async function addRepositoryFollowActivity(
 ): Promise<boolean> {
   try {
     console.log(`Adding repository follow activity for ${repoName} by user ${userData.username}`);
-    
+
     // 1. Add the follow activity
     const activityAdded = await addActivityToCollection(
       {
@@ -861,15 +938,15 @@ export async function addRepositoryFollowActivity(
       userData,
       walletAddress
     );
-    
+
     if (!activityAdded) {
       console.warn(`Failed to add repository follow activity for ${repoName}`);
       return false;
     }
-    
+
     // NOTE: If you want to update follow counts or other repository metrics,
     // add that functionality here
-    
+
     return true;
   } catch (error) {
     console.error(`Error adding repository follow activity for ${repoName}:`, error);
@@ -891,7 +968,7 @@ export async function addUserFollowActivity(
 ): Promise<boolean> {
   try {
     console.log(`Adding user follow activity for ${followedUser.username} by user ${followerUser.username}`);
-    
+
     // 1. Add the follow activity
     const activityAdded = await addActivityToCollection(
       {
@@ -908,15 +985,15 @@ export async function addUserFollowActivity(
       followerUser,
       walletAddress
     );
-    
+
     if (!activityAdded) {
       console.warn(`Failed to add user follow activity for ${followedUser.username}`);
       return false;
     }
-    
+
     // NOTE: If you want to update follower/following counts or other user metrics,
     // add that functionality here
-    
+
     return true;
   } catch (error) {
     console.error(`Error adding user follow activity for ${followedUser.username}:`, error);
@@ -937,10 +1014,10 @@ export async function isFollowingUser(followerWalletAddress: string, followedUse
     if (!follower) {
       return false;
     }
-    
+
     // Get activities
     const activities = await fetchActivities();
-    
+
     // Filter activities to find follow activity from this user to the target user
     const followActivity = activities.find(activity => {
       // Check if this is a user_follow activity from the follower
@@ -951,7 +1028,7 @@ export async function isFollowingUser(followerWalletAddress: string, followedUse
       }
       return false;
     });
-    
+
     return !!followActivity;
   } catch (error) {
     console.error(`Error checking if user is following another user:`, error);
@@ -972,17 +1049,17 @@ export async function isFollowingRepository(walletAddress: string, repoName: str
     if (!user) {
       return false;
     }
-    
+
     // Get activities
     const activities = await fetchActivities();
-    
+
     // Filter activities to find follow activity from this user to the target repository
     const followActivity = activities.find(activity => 
       activity.activity.userId === user.id && 
       activity.activity.type === 'repo_follow' && 
       activity.activity.repoName === repoName
     );
-    
+
     return !!followActivity;
   } catch (error) {
     console.error(`Error checking if user is following repository ${repoName}:`, error);
@@ -998,7 +1075,7 @@ export async function isFollowingRepository(walletAddress: string, repoName: str
 export async function getNFTsByRepoName(repoName: string): Promise<NFT[]> {
   try {
     const allNfts = await fetchNFTs();
-    
+
     // Filter NFTs by repository name
     return allNfts.filter(nft => 
       nft.repoName === repoName ||
@@ -1023,13 +1100,13 @@ export async function hasUserMintedNFTForRepo(walletAddress: string, repoName: s
     if (!user) {
       return false;
     }
-    
+
     // Get all NFTs for this repository
     const repoNfts = await getNFTsByRepoName(repoName);
-    
+
     // Check if any of these NFTs were minted by this user
     const userNft = repoNfts.find(nft => nft.userId === user.id);
-    
+
     return !!userNft;
   } catch (error) {
     console.error(`Error checking if user has minted NFT for repository ${repoName}:`, error);
@@ -1049,25 +1126,26 @@ export async function removeUserFollowActivity(
 ): Promise<boolean> {
   try {
     console.log(`Removing follow activity for ${followedUser.username} by wallet ${followerWalletAddress}`);
-    
+
     // Get user by wallet address
     const follower = await getUserByWalletAddress(followerWalletAddress);
     if (!follower) {
       console.warn(`Follower with wallet address ${followerWalletAddress} not found`);
       return false;
     }
-    
+
+    const activitiesUri = await getGroveUriByKey('activities');
     // 1. Fetch current activities collection
-    const data = await fetchFromGrove<any>(groveUris.activities);
-    
+    const data = await fetchFromGrove<any>(activitiesUri);
+
     // Validate data structure
     if (!data || !Array.isArray(data.activities)) {
       console.warn('Invalid data format for activities:', data);
       return false;
     }
-    
+
     const activities = data.activities;
-    
+
     // Find the index of the follow activity to remove
     const followActivityIndex = activities.findIndex((activity: Activity) => {
       // Use type assertion for the metadata
@@ -1078,36 +1156,36 @@ export async function removeUserFollowActivity(
         metadata?.followedUserId === followedUser.id
       );
     });
-    
+
     if (followActivityIndex === -1) {
       console.warn(`Follow activity not found for ${followedUser.username} by ${follower.username}`);
       return false;
     }
-    
+
     // Remove the activity
     activities.splice(followActivityIndex, 1);
     console.log(`Removed follow activity at index ${followActivityIndex}`);
-    
+
     // 3. Upload the updated collection back to Grove
     const updatedData = { activities };
-    
+
     // Use updateJson to update the existing URI
     const response = await updateJson(
-      groveUris.activities,
+      activitiesUri,
       updatedData,
       followerWalletAddress
     );
-    
+
     console.log('Updated activities collection after removing follow:', response);
-    
+
     // Update the URI in the config if it changed
-    if (response.uri !== groveUris.activities) {
+    if (response.uri !== activitiesUri) {
       await updateGroveUri('activities', response.uri);
     }
-    
+
     // Invalidate all Grove cache entries to ensure fresh data everywhere
     invalidateAllGroveCache();
-    
+
     return true;
   } catch (error) {
     console.error(`Error removing follow activity for ${followedUser.username}:`, error);
