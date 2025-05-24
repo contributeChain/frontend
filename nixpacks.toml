@@ -5,13 +5,7 @@ nixPkgs = ['nodejs_23', 'pnpm']
 cmds = ['rm -rf node_modules && pnpm install --frozen-lockfile']
 
 [phases.build]
-cmds = [
-    'rm -rf dist && pnpm build',
-    'mkdir -p client/src/config',
-    'chmod 777 client/src/config',  # Full access for all users
-    'touch client/src/config/grove-uris.json',
-    'chmod 666 client/src/config/grove-uris.json'
-]
+cmds = ['rm -rf dist && pnpm build', 'mkdir -p /app/client/src/config', 'chmod 777 /app/client/src/config', 'touch /app/client/src/config/grove-uris.json', 'chmod 666 /app/client/src/config/grove-uris.json']
 cacheDirectories = ['node_modules/.cache']
 
 [start]
