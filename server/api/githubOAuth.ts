@@ -3,7 +3,7 @@ import axios from "axios";
 
 const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID || "Ov23lixqQvpop8vkzG0W";
 const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET || "25d6196cabad1bb6b1acdb69356295fcffce450c";
-const GITHUB_REDIRECT_URI = process.env.GITHUB_REDIRECT_URI || "http://n80kw0kw000gw08gok44ogkc.34.67.137.207.sslip.io/auth/callback";
+const GITHUB_REDIRECT_URI = process.env.GITHUB_REDIRECT_URI || "http://lo4ks0s4sok0484gk4k0s8ko.35.208.71.32.sslip.io/auth/callback";
 
 export function setupGitHubOAuthRoutes(app: Express) {
   // Exchange code for access token - GET endpoint
