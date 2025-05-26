@@ -6,7 +6,7 @@ import { addUserToCollection as addUserToGroveCollection } from './grove-service
 // GitHub OAuth configuration
 const GITHUB_CLIENT_ID = import.meta.env.VITE_GITHUB_CLIENT_ID || "Ov23lixqQvpop8vkzG0W";
 const GITHUB_CLIENT_SECRET = import.meta.env.VITE_GITHUB_CLIENT_SECRET || "25d6196cabad1bb6b1acdb69356295fcffce450c";
-const GITHUB_REDIRECT_URI = import.meta.env.VITE_GITHUB_REDIRECT_URI || "http://lo4ks0s4sok0484gk4k0s8ko.35.208.71.32.sslip.io//auth/callback";
+const GITHUB_REDIRECT_URI = import.meta.env.VITE_GITHUB_REDIRECT_URI || "http://f8ksk0o4w0kosswc88s4o8ck.35.208.71.32.sslip.io/auth/callback";
 
 console.log('GITHUB_CLIENT_ID', GITHUB_CLIENT_ID);
 console.log('GITHUB_CLIENT_SECRET', GITHUB_CLIENT_SECRET);
